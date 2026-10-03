@@ -27,6 +27,15 @@ shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, or a pla
   walls, and optionally flush against the nearest wall.
 - **Fit check.** Each item reports *Fits*, *Hits a wall*, *Hits a fixture* (kitchen, bath, WC, washer)
   or *Overlaps furniture*, and turns red when it doesn't fit.
+- **Style from the product photo.** The page can't load ikea.com, so the photo comes from you: on the
+  IKEA page right-click the main photo, *Copy image*, and paste it into the piece's card (or drop or pick
+  a saved image). The page takes the main colours from the photo straight away, then asks Claude (with
+  your permission, on your Claude usage) to read the style: material (fabric, velvet, leather, wood,
+  painted, metal, glass, rattan, ceramic…), legs (block, tapered, turned, metal, hairpin, sled,
+  pedestal, plinth), arms, back and cushions for sofas, headboard, table-top shape, cabinet fronts and
+  handles, lamp shade, vase shape, plant foliage. The 3D model is rebuilt to match, and a small
+  thumbnail of the photo is kept with the piece so collaborators see it too. Everything is editable
+  under *Style*. Catalogue products start with a matching style preset.
 - **Height.** Each piece has a placement: *On the floor*, *On whatever is below it* (rests on the
   table, sideboard, bed, sofa seat or kitchen counter under it, or the floor if there's nothing),
   *At a set height* (cm above the floor), or *Hanging from the ceiling* (cable length from the

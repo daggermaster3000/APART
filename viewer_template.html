@@ -104,6 +104,17 @@ ul.placed .meta .n { font-family: var(--f-mono); font-size: 11.5px; }
 .icons button { background: none; border: 1px solid transparent; color: var(--fg); font: inherit; font-size: 13px; width: 28px; height: 26px; cursor: pointer; }
 .icons button:hover { border-color: var(--line); }
 .empty { color: var(--muted); font-size: 12.5px; margin: 0; }
+.photo { display: flex; gap: 10px; align-items: flex-start; border: 1px dashed var(--line); padding: 8px; }
+.photo.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.photo img, ul.placed img.sw { width: 64px; height: 64px; object-fit: contain; background: #fff; border: 1px solid var(--line); flex: none; }
+ul.placed img.sw { width: 14px; height: 14px; }
+ul.placed li.has-photo { grid-template-columns: 40px minmax(0, 1fr) auto; }
+ul.placed li.has-photo img.sw { width: 40px; height: 40px; grid-row: span 2; }
+ul.placed li.has-photo .meta { grid-column: 2 / 4; }
+details.style summary { cursor: pointer; font-size: 12px; font-weight: 500; }
+.styleGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+.styleGrid label { display: grid; gap: 3px; font-size: 11px; color: var(--muted); }
+.styleGrid input[type=number] { width: 100%; font-family: var(--f-mono); font-size: 12.5px; }
 .here { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
 .here .faces { display: flex; }
 .here img { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--panel); margin-left: -6px; background: var(--line); }
@@ -190,6 +201,16 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
           <div class="desc" id="dDesc"></div>
           <div class="row2"><span class="art" id="dArt"></span><span class="chip" id="dSrc"></span></div>
         </div>
+        <div class="photo" id="dPhotoBox">
+          <img id="dPhoto" alt="Product photo" hidden>
+          <div class="stack" style="flex:1;min-width:0;gap:6px">
+            <div class="row2"><button class="btn ghost" type="button" id="dPhotoBtn">Add product photo</button>
+              <input type="file" id="dPhotoFile" accept="image/*" hidden></div>
+            <p class="note" id="dPhotoHelp">On the IKEA page, right-click the main photo, choose <em>Copy image</em>, then paste it here
+              (Ctrl+V or ⌘V). Or drop a saved image on this box. The model takes its colours and style from it.</p>
+            <p class="status" id="dStyleStatus" role="status"></p>
+          </div>
+        </div>
         <div class="row2">
           <label class="field" style="flex:1">Shape
             <select id="dType"></select></label>
@@ -217,6 +238,9 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
           <label class="field" style="flex:1">Chaise side
             <select id="dCS"><option value="right">Right, seen from the front</option><option value="left">Left, seen from the front</option></select></label>
         </div>
+        <details class="style" id="dStyleBox"><summary>Style</summary>
+          <div class="styleGrid" id="dStyleGrid"></div>
+        </details>
         <p class="status" id="dNote"></p>
         <div class="row2">
           <button class="btn" type="button" id="dPlace">Place in model</button>
@@ -315,6 +339,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 const INFO = /*MODEL_INFO*/null;
 const GLB = "MODEL_GLB_BASE64";
@@ -557,21 +582,22 @@ for (const t of TABS) {
 // depth (front to back; for beds the length), height. Matched against the
 // product link's slug, so every colour/fabric variant of a product matches.
 const CATALOG = [
-  { re: /vimle.*4-seat-sofa-with-chaise-longue/, type: "sofa", w: 336, d: 98, h: 83, chaise: 164 },
-  { re: /vimle.*3-seat-sofa-with-chaise-longue/, type: "sofa", w: 252, d: 98, h: 83, chaise: 164 },
-  { re: /kivik.*3-seat-sofa(?!-with)/, type: "sofa", w: 228, d: 95, h: 83 },
-  { re: /malm.*bed-frame-high/, type: "bed", w: 176, d: 209, h: 100, note: "Size for the 160×200 cm mattress version." },
-  { re: /strandmon.*wing-chair/, type: "armchair", w: 82, d: 96, h: 101 },
-  { re: /poang.*armchair/, type: "armchair", w: 68, d: 82, h: 100 },
-  { re: /ekedalen.*extendable-table/, type: "table", w: 120, d: 80, h: 75, note: "Extends to 180 cm." },
-  { re: /lack.*coffee-table/, type: "table", w: 90, d: 55, h: 45 },
-  { re: /lack.*side-table/, type: "table", w: 55, d: 55, h: 45 },
-  { re: /micke.*desk/, type: "desk", w: 105, d: 50, h: 75 },
-  { re: /hemnes.*8-drawer-dresser|hemnes.*chest-of-8-drawers/, type: "storage", w: 160, d: 50, h: 95 },
-  { re: /brimnes.*tv-bench/, type: "storage", w: 180, d: 41, h: 53 },
-  { re: /billy.*bookcase/, type: "shelving", w: 80, d: 28, h: 202 },
-  { re: /kallax.*shelving-unit/, type: "shelving", w: 77, d: 39, h: 147 },
-  { re: /pax.*wardrobe/, type: "storage", w: 100, d: 58, h: 201 },
+  // `style` = how the product looks, used by the 3D builders until a photo says otherwise
+  { re: /vimle.*4-seat-sofa-with-chaise-longue/, type: "sofa", w: 336, d: 98, h: 83, chaise: 164, style: { material: "fabric", legs: "block", legHeight: 3, arms: "wide", back: "loose-cushions", seatCushions: 4 } },
+  { re: /vimle.*3-seat-sofa-with-chaise-longue/, type: "sofa", w: 252, d: 98, h: 83, chaise: 164, style: { material: "fabric", legs: "block", legHeight: 3, arms: "wide", back: "loose-cushions", seatCushions: 3 } },
+  { re: /kivik.*3-seat-sofa(?!-with)/, type: "sofa", w: 228, d: 95, h: 83, style: { material: "fabric", legs: "block", legHeight: 4, arms: "wide", back: "loose-cushions", seatCushions: 3 } },
+  { re: /malm.*bed-frame-high/, type: "bed", w: 176, d: 209, h: 100, note: "Size for the 160×200 cm mattress version.", style: { material: "wood", headboard: "panel", legs: "plinth" } },
+  { re: /strandmon.*wing-chair/, type: "armchair", w: 82, d: 96, h: 101, style: { material: "fabric", legs: "tapered", legHeight: 16, arms: "rolled", back: "wing" } },
+  { re: /poang.*armchair/, type: "armchair", w: 68, d: 82, h: 100, style: { material: "fabric", legs: "cantilever" } },
+  { re: /ekedalen.*extendable-table/, type: "table", w: 120, d: 80, h: 75, note: "Extends to 180 cm.", style: { material: "wood", legs: "tapered", top: "rect", topThick: 3 } },
+  { re: /lack.*coffee-table/, type: "table", w: 90, d: 55, h: 45, style: { material: "painted", legs: "square", top: "rect", topThick: 5, apron: false } },
+  { re: /lack.*side-table/, type: "table", w: 55, d: 55, h: 45, style: { material: "painted", legs: "square", top: "rect", topThick: 5, apron: false } },
+  { re: /micke.*desk/, type: "desk", w: 105, d: 50, h: 75, style: { material: "painted", legs: "square", top: "rect", topThick: 2 } },
+  { re: /hemnes.*8-drawer-dresser|hemnes.*chest-of-8-drawers/, type: "storage", w: 160, d: 50, h: 95, style: { material: "wood", fronts: "drawers", handles: "knob", legs: "plinth" } },
+  { re: /brimnes.*tv-bench/, type: "storage", w: 180, d: 41, h: 53, style: { material: "painted", fronts: "mixed", handles: "none", legs: "plinth" } },
+  { re: /billy.*bookcase/, type: "shelving", w: 80, d: 28, h: 202, style: { material: "painted" } },
+  { re: /kallax.*shelving-unit/, type: "shelving", w: 77, d: 39, h: 147, style: { material: "painted" } },
+  { re: /pax.*wardrobe/, type: "storage", w: 100, d: 58, h: 201, style: { material: "painted", fronts: "doors", handles: "bar", legs: "plinth" } },
 ];
 
 const SHAPES = {
@@ -696,13 +722,15 @@ width = side to side seen from the front; depth = front to back (for beds: the t
 Reply with only this JSON:
 {"shape": one of ${JSON.stringify(Object.keys(SHAPES))}, "width_cm": number, "depth_cm": number, "height_cm": number,
  "chaise_depth_cm": number or null, "confident": true if you know this exact product's listed measurements, else false,
+ "style": {"material": one of ${JSON.stringify(STYLE_OPTIONS.material)}, "legs": one of ${JSON.stringify(STYLE_OPTIONS.legs)},
+   "arms", "back", "top", "fronts", "handles", "shade", "profile": pick from ${JSON.stringify({ arms: STYLE_OPTIONS.arms, back: STYLE_OPTIONS.back, top: STYLE_OPTIONS.top, fronts: STYLE_OPTIONS.fronts, handles: STYLE_OPTIONS.handles, shade: STYLE_OPTIONS.shade, profile: STYLE_OPTIONS.profile })} where they apply},
  "note": "at most 12 words"}`;
   try {
     const r = await sample.json(prompt, { modelTier: "default", cache: { gcTime: 86400000 } });
     const n = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : null);
     if (!n(r?.width_cm) || !n(r?.depth_cm) || !n(r?.height_cm)) return null;
     return { type: SHAPES[r.shape] ? r.shape : null, w: n(r.width_cm), d: n(r.depth_cm), h: n(r.height_cm),
-      chaise: n(r.chaise_depth_cm) ?? 0, confident: !!r.confident, note: String(r.note ?? "").slice(0, 120) };
+      chaise: n(r.chaise_depth_cm) ?? 0, confident: !!r.confident, note: String(r.note ?? "").slice(0, 120), style: r.style };
   } catch (e) {
     if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e?.code)) sampleBlocked = true;
     return { error: e?.code ?? "upstream_error" };
@@ -710,188 +738,408 @@ Reply with only this JSON:
 }
 
 // ---- 3D builders. Local frame: x = width, z = depth (back at -z), y up, origin at footprint centre.
+// Every builder reads a style (from a product photo, a catalogue preset, or the defaults per shape).
 const furnRoot = new THREE.Group();
 scene.add(furnRoot);
-const edgeMat = new THREE.LineBasicMaterial({ color: 0x1d2328, transparent: true, opacity: 0.35, clippingPlanes: [cutPlane] });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x1d2328, transparent: true, opacity: 0.22, clippingPlanes: [cutPlane] });
 function shade(hex, k) { const c = new THREE.Color(hex); c.offsetHSL(0, 0, k); return c; }
-function makeMat(hex) {
-  return new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.9, clippingPlanes: [cutPlane] });
+
+const STYLE_OPTIONS = {
+  material: ["fabric", "velvet", "leather", "wood", "painted", "metal", "glass", "rattan", "ceramic", "plastic", "paper"],
+  legs: ["none", "block", "square", "tapered", "turned", "metal", "hairpin", "sled", "pedestal", "plinth", "cantilever"],
+  arms: ["none", "slim", "wide", "rolled", "sloped"],
+  back: ["loose-cushions", "tight", "wing", "low"],
+  headboard: ["panel", "upholstered", "none"],
+  top: ["rect", "round", "oval"],
+  fronts: ["drawers", "doors", "glass-doors", "open", "mixed"],
+  handles: ["knob", "bar", "none"],
+  shade: ["dome", "cone", "drum", "globe", "bell"],
+  profile: ["auto", "vase-tall", "vase-round", "bottle", "cylinder", "bowl", "frame"],
+  foliage: ["leafy", "upright", "bushy"],
+};
+// which style fields matter for which shape
+const STYLE_FIELDS = {
+  sofa: ["material", "legs", "legHeight", "arms", "back", "seatCushions"],
+  armchair: ["material", "legs", "legHeight", "arms", "back"],
+  bed: ["material", "headboard", "legs", "legHeight"],
+  table: ["material", "top", "legs", "topThick"], desk: ["material", "top", "legs", "topThick"],
+  chair: ["material", "legs"],
+  storage: ["material", "fronts", "handles", "legs", "legHeight"], shelving: ["material"],
+  rug: ["material"], lamp: ["material", "shade"], tablelamp: ["material", "shade"], pendant: ["material", "shade"],
+  plant: ["material", "foliage"], deco: ["material", "profile"], box: ["material"],
+};
+const TYPE_STYLE = {
+  sofa: { material: "fabric", legs: "block", legHeight: 6, arms: "slim", back: "loose-cushions" },
+  armchair: { material: "fabric", legs: "tapered", legHeight: 12, arms: "slim", back: "tight" },
+  bed: { material: "wood", headboard: "panel", legs: "plinth" },
+  table: { material: "wood", top: "rect", legs: "square", topThick: 3 },
+  desk: { material: "painted", top: "rect", legs: "square", topThick: 3 },
+  chair: { material: "wood", legs: "square" },
+  storage: { material: "painted", fronts: "drawers", handles: "knob", legs: "plinth", legHeight: 8 },
+  shelving: { material: "painted" }, rug: { material: "fabric" },
+  lamp: { material: "metal", shade: "drum" }, tablelamp: { material: "ceramic", shade: "drum" },
+  pendant: { material: "metal", shade: "dome" }, plant: { material: "ceramic", foliage: "leafy" },
+  deco: { material: "ceramic", profile: "auto" }, box: { material: "painted" },
+};
+function styleOf(it) {
+  const preset = CATALOG.find((c) => c.re.test(it.slug ?? ""))?.style;
+  return { ...(TYPE_STYLE[it.type] ?? {}), ...(preset ?? {}), ...(it.style ?? {}) };
 }
-function blk(g, mat, x0, x1, y0, y1, z0, z1) {
+
+// grayscale tile textures, tinted by each material's colour
+const TEX = {};
+function texture(kind) {
+  if (TEX[kind] !== undefined) return TEX[kind];
+  const N = 128, c = document.createElement("canvas"); c.width = c.height = N;
+  const x = c.getContext("2d"), img = x.createImageData(N, N);
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    let v = 240;
+    if (kind === "fabric") v = 228 + rnd() * 18 - ((i % 3 === 0) ^ (j % 3 === 0) ? 10 : 0);
+    else if (kind === "velvet") v = 238 + 5 * Math.sin(i * 0.09 + Math.sin(j * 0.05) * 2) + rnd() * 6;
+    else if (kind === "leather") v = 232 + rnd() * 14 - (rnd() > 0.985 ? 30 : 0);
+    else if (kind === "wood") v = 214 + 22 * Math.sin(i * 0.32 + Math.sin(j * 0.045) * 3 + Math.sin(j * 0.21) * 0.6) + rnd() * 10;
+    else if (kind === "rattan") { const a = (Math.floor(i / 8) + Math.floor(j / 8)) % 2; v = 210 + (a ? (i % 8) * 4 : (j % 8) * 4) + rnd() * 8; }
+    else return (TEX[kind] = null);
+    const k = (j * N + i) * 4; img.data[k] = img.data[k + 1] = img.data[k + 2] = Math.max(0, Math.min(255, v)); img.data[k + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  t.repeat.set(kind === "wood" ? 1 : 3, kind === "wood" ? 1 : 3);
+  return (TEX[kind] = t);
+}
+function makeMat(hex, material = "painted") {
+  const base = { color: new THREE.Color(hex), clippingPlanes: [cutPlane] };
+  switch (material) {
+    case "fabric": return new THREE.MeshStandardMaterial({ ...base, roughness: 0.97, map: texture("fabric") });
+    case "velvet": return new THREE.MeshPhysicalMaterial({ ...base, roughness: 0.75, sheen: 1, sheenRoughness: 0.4, sheenColor: shade(hex, 0.25), map: texture("velvet") });
+    case "leather": return new THREE.MeshStandardMaterial({ ...base, roughness: 0.45, map: texture("leather") });
+    case "wood": return new THREE.MeshStandardMaterial({ ...base, roughness: 0.68, map: texture("wood") });
+    case "rattan": return new THREE.MeshStandardMaterial({ ...base, roughness: 0.9, map: texture("rattan") });
+    case "metal": return new THREE.MeshStandardMaterial({ ...base, roughness: 0.32, metalness: 0.85 });
+    case "glass": return new THREE.MeshPhysicalMaterial({ ...base, roughness: 0.05, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
+    case "ceramic": return new THREE.MeshStandardMaterial({ ...base, roughness: 0.28 });
+    case "plastic": return new THREE.MeshStandardMaterial({ ...base, roughness: 0.42 });
+    case "paper": return new THREE.MeshStandardMaterial({ ...base, roughness: 1, emissive: shade(hex, -0.1), emissiveIntensity: 0.35, side: THREE.DoubleSide });
+    default: return new THREE.MeshStandardMaterial({ ...base, roughness: 0.6 });
+  }
+}
+function blk(g, mat, x0, x1, y0, y1, z0, z1, round = 0) {
   const w = x1 - x0, h = y1 - y0, d = z1 - z0;
-  if (w <= 0.001 || h <= 0.001 || d <= 0.001) return;
-  const geo = new THREE.BoxGeometry(w, h, d);
+  if (w <= 0.001 || h <= 0.001 || d <= 0.001) return null;
+  const r = Math.min(round, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001);
+  const geo = r > 0.004 ? new RoundedBoxGeometry(w, h, d, 3, r) : new THREE.BoxGeometry(w, h, d);
   const m = new THREE.Mesh(geo, mat);
   m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
   m.castShadow = true; m.receiveShadow = true;
-  const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
-  m.add(e);
+  if (r <= 0.004) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat));
   g.add(m);
+  return m;
 }
-function buildSofa(g, it, mats) {
+function mesh(g, geo, mat, y) { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = true; m.receiveShadow = true; g.add(m); return m; }
+function cyl(g, mat, x, z, y0, y1, r0, r1 = r0, seg = 16) {
+  const m = mesh(g, new THREE.CylinderGeometry(r1, r0, y1 - y0, seg), mat, (y0 + y1) / 2); m.position.x = x; m.position.z = z; return m;
+}
+// one leg of a given style at (x, z) from the floor up to y1
+function leg(g, mat, st, x, z, y1, size = 0.04) {
+  const kind = st.legs;
+  if (y1 <= 0.005 || kind === "none" || kind === "plinth") return;
+  if (kind === "tapered") cyl(g, mat, x, z, 0, y1, size * 0.32, size * 0.55, 12);
+  else if (kind === "turned") {
+    const p = [[0, 0], [0.5, 0], [0.42, 0.12], [0.62, 0.3], [0.38, 0.5], [0.45, 0.82], [0.6, 0.9], [0.6, 1], [0, 1]];
+    const m = mesh(g, new THREE.LatheGeometry(p.map(([a, b]) => new THREE.Vector2(a * size, b * y1)), 14), mat, 0); m.position.x = x; m.position.z = z;
+  }
+  else if (kind === "metal") cyl(g, mat, x, z, 0, y1, 0.011, 0.011, 10);
+  else if (kind === "hairpin") {
+    for (const s of [-1, 1]) { const r = cyl(g, mat, x + s * size * 0.6, z, 0, y1, 0.006, 0.006, 6); r.rotation.z = s * 0.12; }
+  }
+  else if (kind === "block") blk(g, mat, x - size * 0.6, x + size * 0.6, 0, y1, z - size * 0.6, z + size * 0.6, 0.006);
+  else blk(g, mat, x - size / 2, x + size / 2, 0, y1, z - size / 2, z + size / 2);
+}
+// four legs (or a sled / pedestal) under a w × d body centred at z = oz
+function legSet(g, mat, st, w, d, y1, size = 0.04, inset = 0.04, oz = 0) {
+  if (st.legs === "sled") {
+    for (const sx of [-1, 1]) {
+      const x = sx * (w / 2 - inset);
+      blk(g, mat, x - 0.012, x + 0.012, 0, 0.02, oz - d / 2 + inset, oz + d / 2 - inset);
+      for (const sz of [-1, 1]) blk(g, mat, x - 0.012, x + 0.012, 0, y1, oz + sz * (d / 2 - inset) - 0.012, oz + sz * (d / 2 - inset) + 0.012);
+    }
+    return;
+  }
+  if (st.legs === "pedestal") {
+    cyl(g, mat, 0, oz, 0, 0.03, Math.min(w, d) * 0.3, Math.min(w, d) * 0.28, 32);
+    cyl(g, mat, 0, oz, 0.03, y1, 0.05, 0.06, 20);
+    return;
+  }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) leg(g, mat, st, sx * (w / 2 - inset - size / 2), oz + sz * (d / 2 - inset - size / 2), y1, size);
+}
+const legMat = (st, mats) => (st.legs === "metal" || st.legs === "hairpin" || st.legs === "sled") ? makeMat(mats.dark.color.getStyle(), "metal") : mats.dark;
+
+function buildSofa(g, it, mats, st) {
   const w = it.w / 100, d = it.d / 100, h = it.h / 100;
   const armchair = it.type === "armchair";
-  const a = /wide-armrests/.test(it.slug ?? "") ? 0.22 : Math.min(armchair ? 0.16 : 0.15, w * 0.12);
-  const legH = 0.06, baseTop = Math.min(0.30, h * 0.36), seatTop = Math.min(0.48, h * 0.6);
-  const armTop = Math.min(0.62, h * 0.72), backD = Math.min(0.26, d * 0.27);
+  if (st.legs === "cantilever") return buildCantilever(g, it, mats, st);
+  const legH = st.legs === "none" || st.legs === "plinth" ? 0 : Math.max(0, (st.legHeight ?? 6) / 100);
+  const a = { none: 0, slim: Math.min(0.12, w * 0.09), wide: 0.22, rolled: Math.min(0.16, w * 0.13), sloped: Math.min(0.16, w * 0.12) }[st.arms]
+    ?? (/wide-armrests/.test(it.slug ?? "") ? 0.22 : 0.15);
+  const baseTop = Math.max(legH + 0.12, Math.min(0.30, h * 0.36)), seatTop = Math.max(baseTop + 0.08, Math.min(0.48, h * 0.6));
+  const armTop = st.arms === "sloped" ? Math.min(0.56, h * 0.66) : Math.min(0.64, h * 0.74);
+  const backD = st.back === "loose-cushions" ? Math.min(0.14, d * 0.15) : Math.min(0.24, d * 0.25);
   const D = Math.max(d, it.chaise / 100 || 0);
-  const z0 = -D / 2, zf = z0 + d; // back face, front face of the main seat
-  const { main, dark, cush } = mats;
-  blk(g, dark, -w / 2 + 0.04, w / 2 - 0.04, 0, legH, z0 + 0.04, zf - 0.04);
-  blk(g, main, -w / 2, w / 2, legH, baseTop, z0, zf);
-  blk(g, cush, -w / 2 + a, w / 2 - a, baseTop, seatTop, z0 + backD, zf);
-  blk(g, main, -w / 2 + a, w / 2 - a, baseTop, h, z0, z0 + backD);
+  const z0 = -D / 2, zf = z0 + d;
+  const { main, cush } = mats, lm = legMat(st, mats);
+  const R = st.material === "leather" ? 0.03 : 0.045;
+  // legs or plinth
+  if (legH > 0) legSet(g, lm, st, w, d, legH, 0.045, 0.06, (z0 + zf) / 2);
+  else blk(g, mats.dark, -w / 2 + 0.03, w / 2 - 0.03, 0, 0.03, z0 + 0.03, zf - 0.03);
+  blk(g, main, -w / 2 + a * 0.5, w / 2 - a * 0.5, Math.max(legH, 0.03), baseTop, z0, zf, 0.02);
+  // seat cushions
+  const inner = w - 2 * a;
+  const n = Math.max(1, Math.min(6, st.seatCushions || Math.round(inner / (armchair ? 1 : 0.68))));
+  for (let k = 0; k < n; k++) {
+    const x0 = -w / 2 + a + inner * k / n, x1 = -w / 2 + a + inner * (k + 1) / n;
+    blk(g, cush, x0 + 0.005, x1 - 0.005, baseTop, seatTop, z0 + backD, zf, R);
+  }
+  // back
+  const backTop = st.back === "low" ? h * 0.82 : h;
+  if (st.back === "loose-cushions") {
+    blk(g, main, -w / 2 + a * 0.5, w / 2 - a * 0.5, baseTop, backTop * 0.86, z0, z0 + backD, 0.02);
+    for (let k = 0; k < n; k++) {
+      const x0 = -w / 2 + a + inner * k / n, x1 = -w / 2 + a + inner * (k + 1) / n;
+      const c = blk(g, cush, x0 + 0.01, x1 - 0.01, seatTop - 0.02, backTop, z0 + backD - 0.02, z0 + backD + 0.17, 0.06);
+      if (c) { c.rotation.x = -0.12; c.position.z -= 0.015; }
+    }
+  } else {
+    blk(g, main, -w / 2 + a * 0.5, w / 2 - a * 0.5, baseTop, backTop, z0, z0 + backD, R);
+  }
+  if (st.back === "wing") for (const sx of [-1, 1]) blk(g, main, sx > 0 ? w / 2 - a : -w / 2, sx > 0 ? w / 2 : -w / 2 + a, armTop, backTop - 0.02, z0, z0 + Math.min(0.32, d * 0.4), 0.04);
   const rects = [[-w / 2, z0, w / 2, zf]];
+  const arm = (x0, x1, za, zb) => {
+    if (a <= 0) return;
+    blk(g, main, x0, x1, Math.max(legH, 0.03), armTop, za, zb, R);
+    if (st.arms === "rolled") { const r = cyl(g, main, (x0 + x1) / 2, (za + zb) / 2, 0, zb - za, a * 0.62, a * 0.62, 20); r.rotation.x = Math.PI / 2; r.position.y = armTop; }
+  };
   if (it.chaise / 100 > d + 0.05 && !armchair) {
     const s = it.chaiseSide === "left" ? -1 : 1;
     const cw = Math.min(0.98, w * 0.42);
     const xa = s > 0 ? w / 2 - cw : -w / 2, xb = s > 0 ? w / 2 : -w / 2 + cw;
-    blk(g, dark, xa + 0.04, xb - 0.04, 0, legH, zf - 0.04, z0 + D - 0.04);
-    blk(g, main, xa, xb, legH, baseTop, zf, z0 + D);
+    if (legH > 0) for (const sx of [xa + 0.06, xb - 0.06]) leg(g, lm, st, sx, z0 + D - 0.06, legH, 0.045);
+    blk(g, main, xa, xb, Math.max(legH, 0.03), baseTop, zf - 0.02, z0 + D, 0.02);
     const ia = s > 0 ? xa : xa + a, ib = s > 0 ? xb - a : xb;
-    blk(g, cush, ia, ib, baseTop, seatTop, zf - 0.02, z0 + D);
+    blk(g, cush, ia + 0.005, ib - 0.005, baseTop, seatTop, zf - 0.01, z0 + D, R);
     rects.push([xa, zf, xb, z0 + D]);
-    // the arm on the chaise side runs the full depth
-    if (s > 0) { blk(g, main, w / 2 - a, w / 2, baseTop, armTop, z0, z0 + D); blk(g, main, -w / 2, -w / 2 + a, baseTop, armTop, z0, zf); }
-    else { blk(g, main, -w / 2, -w / 2 + a, baseTop, armTop, z0, z0 + D); blk(g, main, w / 2 - a, w / 2, baseTop, armTop, z0, zf); }
+    if (s > 0) { arm(w / 2 - a, w / 2, z0, z0 + D); arm(-w / 2, -w / 2 + a, z0, zf); }
+    else { arm(-w / 2, -w / 2 + a, z0, z0 + D); arm(w / 2 - a, w / 2, z0, zf); }
   } else {
-    blk(g, main, -w / 2, -w / 2 + a, baseTop, armTop, z0, zf);
-    blk(g, main, w / 2 - a, w / 2, baseTop, armTop, z0, zf);
+    arm(-w / 2, -w / 2 + a, z0, zf);
+    arm(w / 2 - a, w / 2, z0, zf);
   }
   return rects;
 }
-function buildBed(g, it, { main, dark, cush }) {
+// POÄNG-style bentwood frame with one long cushion
+function buildCantilever(g, it, mats, st) {
   const w = it.w / 100, d = it.d / 100, h = it.h / 100;
-  const frameTop = Math.min(0.38, h * 0.4), mat = new THREE.MeshStandardMaterial({ color: 0xf4f3ef, roughness: 1, clippingPlanes: [cutPlane] });
-  blk(g, main, -w / 2, w / 2, 0, frameTop, -d / 2 + 0.06, d / 2);
-  blk(g, mat, -w / 2 + 0.07, w / 2 - 0.07, frameTop - 0.12, frameTop + 0.08, -d / 2 + 0.07, d / 2 - 0.03);
-  blk(g, main, -w / 2, w / 2, 0, h, -d / 2, -d / 2 + 0.06);
-  blk(g, cush, -w / 2 + 0.2, -0.05, frameTop + 0.08, frameTop + 0.18, -d / 2 + 0.1, -d / 2 + 0.55);
-  blk(g, cush, 0.05, w / 2 - 0.2, frameTop + 0.08, frameTop + 0.18, -d / 2 + 0.1, -d / 2 + 0.55);
-  return [[-w / 2, -d / 2, w / 2, d / 2]];
-}
-function buildTable(g, it, { main, dark }) {
-  const w = it.w / 100, d = it.d / 100, h = it.h / 100, t = 0.03, l = Math.min(0.05, w * 0.1), i = 0.04;
-  blk(g, main, -w / 2, w / 2, h - t, h, -d / 2, d / 2);
-  const legs = dark ?? main;
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const x = sx * (w / 2 - i - l / 2), z = sz * (d / 2 - i - l / 2);
-    blk(g, legs, x - l / 2, x + l / 2, 0, h - t, z - l / 2, z + l / 2);
+  const wood = makeMat(it.colour2 ?? "#d8bf94", "wood");
+  for (const sx of [-1, 1]) {
+    const x = sx * (w / 2 - 0.03);
+    blk(g, wood, x - 0.025, x + 0.025, 0, 0.025, -d / 2 + 0.05, d / 2 - 0.02, 0.008);       // floor runner
+    const arm = blk(g, wood, x - 0.025, x + 0.025, 0.5, 0.53, -d / 2 + 0.1, d / 2 - 0.05, 0.01); // armrest
+    const up = blk(g, wood, x - 0.025, x + 0.025, 0.02, 0.5, d / 2 - 0.08, d / 2 - 0.04, 0.008); // front upright
+    if (up) up.rotation.x = 0.25;
   }
-  if (it.type === "desk") blk(g, main, -w / 2 + i, w / 2 - i, h - 0.12, h - t, -d / 2 + i, -d / 2 + i + 0.02);
+  const seat = blk(g, mats.cush, -w / 2 + 0.07, w / 2 - 0.07, 0.3, 0.42, -d / 2 + 0.2, d / 2 - 0.08, 0.05);
+  if (seat) seat.rotation.x = 0.18;
+  const back = blk(g, mats.cush, -w / 2 + 0.08, w / 2 - 0.08, 0.36, h, -d / 2 + 0.06, -d / 2 + 0.2, 0.05);
+  if (back) back.rotation.x = -0.32;
   return [[-w / 2, -d / 2, w / 2, d / 2]];
 }
-function buildChair(g, it, { main, dark }) {
-  const w = it.w / 100, d = it.d / 100, h = it.h / 100, seat = Math.min(0.46, h * 0.56), l = 0.035;
-  for (const sx of [-1, 1]) for (const sz of [-1, 1])
-    blk(g, dark ?? main, sx * (w / 2 - l) - l / 2, sx * (w / 2 - l) + l / 2, 0, seat - 0.04, sz * (d / 2 - l) - l / 2, sz * (d / 2 - l) + l / 2);
-  blk(g, main, -w / 2, w / 2, seat - 0.04, seat, -d / 2, d / 2);
-  if (h > seat + 0.1) blk(g, main, -w / 2, w / 2, seat, h, -d / 2, -d / 2 + 0.04);
+function buildBed(g, it, mats, st) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100;
+  const legH = st.legs === "plinth" || st.legs === "none" ? 0 : Math.max(0, (st.legHeight ?? 20) / 100);
+  const frameTop = Math.max(legH + 0.1, Math.min(0.38, h * 0.4));
+  const linen = new THREE.MeshStandardMaterial({ color: 0xf4f3ef, roughness: 1, map: texture("fabric"), clippingPlanes: [cutPlane] });
+  if (legH > 0) legSet(g, legMat(st, mats), st, w, d, legH, 0.05, 0.05);
+  blk(g, mats.main, -w / 2, w / 2, legH, frameTop, -d / 2 + 0.06, d / 2);
+  blk(g, linen, -w / 2 + 0.07, w / 2 - 0.07, frameTop - 0.12, frameTop + 0.1, -d / 2 + 0.07, d / 2 - 0.03, 0.05);
+  // duvet over the lower two thirds
+  blk(g, makeMat(shade("#e9e4da", 0).getStyle(), "fabric"), -w / 2 + 0.05, w / 2 - 0.05, frameTop + 0.04, frameTop + 0.14, -d / 2 + 0.6, d / 2 - 0.01, 0.05);
+  if (st.headboard === "upholstered") blk(g, makeMat(it.colour, "fabric"), -w / 2, w / 2, legH, h, -d / 2, -d / 2 + 0.1, 0.05);
+  else if (st.headboard !== "none") blk(g, mats.main, -w / 2, w / 2, legH, h, -d / 2, -d / 2 + 0.06);
+  for (const sx of [-1, 1]) blk(g, linen, sx > 0 ? 0.04 : -w / 2 + 0.16, sx > 0 ? w / 2 - 0.16 : -0.04, frameTop + 0.1, frameTop + 0.22, -d / 2 + 0.1, -d / 2 + 0.52, 0.06);
   return [[-w / 2, -d / 2, w / 2, d / 2]];
 }
-function buildStorage(g, it, { main, dark }) {
+function buildTable(g, it, mats, st) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, t = Math.max(0.015, (st.topThick ?? 3) / 100);
+  const { main } = mats, lm = legMat(st, mats);
+  const lsize = st.legs === "block" || (st.legs === "square" && t >= 0.045) ? 0.05 : 0.045;
+  if (st.top === "round" || st.top === "oval") {
+    const m = cyl(g, main, 0, 0, h - t, h, w / 2, w / 2, 48); m.scale.z = d / w;
+    const ps = st.legs === "pedestal" ? st : { ...st };
+    if (st.legs === "pedestal") legSet(g, lm, ps, w, d, h - t);
+    else for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2; leg(g, lm, st, Math.cos(a) * w * 0.33, Math.sin(a) * d * 0.33, h - t, lsize); }
+  } else {
+    blk(g, main, -w / 2, w / 2, h - t, h, -d / 2, d / 2);
+    legSet(g, lm, st, w, d, h - t, lsize, 0.04);
+    if (st.apron !== false && st.legs !== "hairpin" && st.legs !== "pedestal" && h > 0.6)
+      blk(g, lm, -w / 2 + 0.05, w / 2 - 0.05, h - t - 0.08, h - t, -d / 2 + 0.05, d / 2 - 0.05);
+  }
+  if (it.type === "desk") blk(g, main, -w / 2 + 0.05, -w / 2 + 0.05 + Math.min(0.4, w * 0.35), h - t - 0.14, h - t, -d / 2 + 0.05, d / 2 - 0.03);
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+function buildChair(g, it, mats, st) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, seat = Math.min(0.46, h * 0.56);
+  const lm = legMat(st, mats);
+  legSet(g, lm, st.legs === "plinth" ? { ...st, legs: "square" } : st, w, d, seat - 0.04, 0.035, 0.01);
+  blk(g, st.material === "fabric" || st.material === "velvet" ? mats.cush : mats.main, -w / 2, w / 2, seat - 0.04, seat, -d / 2, d / 2, 0.01);
+  if (h > seat + 0.1) {
+    const b = blk(g, mats.main, -w / 2 + 0.01, w / 2 - 0.01, seat + 0.1, h, -d / 2, -d / 2 + 0.03, 0.01);
+    for (const sx of [-1, 1]) blk(g, lm, sx * (w / 2 - 0.03) - 0.015, sx * (w / 2 - 0.03) + 0.015, seat, h, -d / 2, -d / 2 + 0.03);
+  }
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+function buildStorage(g, it, mats, st) {
   const w = it.w / 100, d = it.d / 100, h = it.h / 100, t = 0.018;
+  const { main } = mats;
   if (it.type === "shelving") {
     blk(g, main, -w / 2, -w / 2 + t, 0, h, -d / 2, d / 2);
     blk(g, main, w / 2 - t, w / 2, 0, h, -d / 2, d / 2);
     blk(g, main, -w / 2, w / 2, 0, 0.06, -d / 2, d / 2);
     blk(g, main, -w / 2, w / 2, h - t, h, -d / 2, d / 2);
     blk(g, main, -w / 2 + t, w / 2 - t, 0.06, h - t, -d / 2, -d / 2 + 0.008);
-    const n = Math.max(1, Math.round(h / 0.36) - 1);
+    const kallax = /kallax/.test(it.slug ?? "");
+    const n = kallax ? Math.max(1, Math.round(h / 0.39) - 1) : Math.max(1, Math.round(h / 0.36) - 1);
     for (let k = 1; k <= n; k++) { const y = 0.06 + (h - 0.06) * k / (n + 1); blk(g, main, -w / 2 + t, w / 2 - t, y - t / 2, y + t / 2, -d / 2, d / 2); }
-    // KALLAX-style cubes get vertical dividers too
-    if (/kallax/.test(it.slug ?? "")) { const c = Math.max(1, Math.round(w / 0.39)); for (let k = 1; k < c; k++) { const x = -w / 2 + w * k / c; blk(g, main, x - t / 2, x + t / 2, 0.06, h - t, -d / 2, d / 2); } }
-  } else {
-    blk(g, dark ?? main, -w / 2 + 0.03, w / 2 - 0.03, 0, 0.08, -d / 2 + 0.03, d / 2 - 0.05);
-    blk(g, main, -w / 2, w / 2, 0.08, h, -d / 2, d / 2 - 0.02);
-    const rows = h > 1.6 ? 1 : Math.max(1, Math.round((h - 0.08) / 0.2));
-    const cols = h > 1.6 ? Math.max(1, Math.round(w / 0.5)) : (w > 1.1 ? 2 : 1);
-    const front = shade(main.color, 0.04);
-    const fm = new THREE.MeshStandardMaterial({ color: front, roughness: 0.85, clippingPlanes: [cutPlane] });
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const x0 = -w / 2 + 0.01 + (w - 0.02) * c / cols, x1 = -w / 2 + 0.01 + (w - 0.02) * (c + 1) / cols;
-      const y0 = 0.09 + (h - 0.1) * r / rows, y1 = 0.09 + (h - 0.1) * (r + 1) / rows;
-      blk(g, fm, x0 + 0.003, x1 - 0.003, y0 + 0.003, y1 - 0.003, d / 2 - 0.02, d / 2);
-    }
+    if (kallax) { const c = Math.max(1, Math.round(w / 0.39)); for (let k = 1; k < c; k++) { const x = -w / 2 + w * k / c; blk(g, main, x - t / 2, x + t / 2, 0.06, h - t, -d / 2, d / 2); } }
+    return [[-w / 2, -d / 2, w / 2, d / 2]];
   }
+  const legH = st.legs === "plinth" || st.legs === "none" ? 0 : Math.max(0, (st.legHeight ?? 15) / 100);
+  const bot = legH > 0 ? legH : 0.08;
+  if (legH > 0) legSet(g, legMat(st, mats), st, w, d, legH, 0.04, 0.05);
+  else blk(g, mats.dark, -w / 2 + 0.03, w / 2 - 0.03, 0, 0.08, -d / 2 + 0.03, d / 2 - 0.05);
+  blk(g, main, -w / 2, w / 2, bot, h, -d / 2, d / 2 - 0.02);
+  const fm = makeMat(shade(main.color, 0.035).getStyle(), st.material);
+  const glass = makeMat("#cfe0e6", "glass");
+  const handle = makeMat(st.handles === "knob" && st.material === "wood" ? shade(main.color, -0.2).getStyle() : "#3a3d40", "metal");
+  const front = (x0, x1, y0, y1, kind) => {
+    if (kind === "open") { blk(g, mats.dark, x0 + 0.01, x1 - 0.01, y0 + 0.01, y1 - 0.01, d / 2 - 0.03, d / 2 - 0.02); return; }
+    blk(g, kind === "glass" ? glass : fm, x0 + 0.003, x1 - 0.003, y0 + 0.003, y1 - 0.003, d / 2 - 0.02, d / 2);
+    if (st.handles === "none") return;
+    const cx = kind === "door" ? (x1 > 0 ? x0 + 0.04 : x1 - 0.04) : (x0 + x1) / 2;
+    const cy = kind === "door" ? (y0 + y1) / 2 : y1 - Math.min(0.05, (y1 - y0) / 3);
+    if (st.handles === "knob") { const k = cyl(g, handle, cx, d / 2 + 0.012, 0, 0.025, 0.012, 0.014, 12); k.rotation.x = Math.PI / 2; k.position.y = cy; }
+    else blk(g, handle, kind === "door" ? cx - 0.006 : cx - Math.min(0.08, (x1 - x0) / 4), kind === "door" ? cx + 0.006 : cx + Math.min(0.08, (x1 - x0) / 4),
+      kind === "door" ? cy - 0.08 : cy - 0.006, kind === "door" ? cy + 0.08 : cy + 0.006, d / 2, d / 2 + 0.02);
+  };
+  const H = h - bot - 0.01, X0 = -w / 2 + 0.01, W = w - 0.02;
+  const grid = (y0, y1, rows, cols, kind) => { for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
+    front(X0 + W * c / cols, X0 + W * (c + 1) / cols, y0 + (y1 - y0) * r / rows, y0 + (y1 - y0) * (r + 1) / rows, kind); };
+  const fr = st.fronts;
+  if (fr === "doors" || fr === "glass-doors") grid(bot, h - 0.01, 1, Math.max(1, Math.round(w / 0.5)), fr === "glass-doors" ? "glass" : "door");
+  else if (fr === "open") grid(bot, h - 0.01, Math.max(1, Math.round(H / 0.35)), Math.max(1, Math.round(w / 0.8)), "open");
+  else if (fr === "mixed") { const split = bot + H * 0.42; grid(bot, split, 1, Math.max(1, Math.round(w / 0.6)), "drawer"); grid(split, h - 0.01, 1, Math.max(1, Math.round(w / 0.6)), "open"); }
+  else grid(bot, h - 0.01, Math.max(1, Math.round(H / 0.2)), w > 1.1 ? 2 : 1, "drawer");
   return [[-w / 2, -d / 2, w / 2, d / 2]];
 }
-function buildRug(g, it, { main }) {
+function buildRug(g, it, mats) {
   const w = it.w / 100, d = it.d / 100;
-  blk(g, main, -w / 2, w / 2, 0.001, Math.max(0.006, it.h / 100), -d / 2, d / 2);
+  blk(g, mats.main, -w / 2, w / 2, 0.001, Math.max(0.006, it.h / 100), -d / 2, d / 2);
   return []; // rugs never collide
 }
-function buildLamp(g, it, { main, dark }) {
-  const w = it.w / 100, h = it.h / 100;
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.35, w * 0.35, 0.03, 24), dark ?? main);
-  base.position.y = 0.015; g.add(base);
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, h - 0.3, 8), dark ?? main);
-  pole.position.y = (h - 0.3) / 2; g.add(pole);
-  const shadeM = new THREE.MeshStandardMaterial({ color: 0xf6efe1, emissive: 0x6b5a3a, roughness: 1, clippingPlanes: [cutPlane] });
-  const s = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.35, w / 2, 0.3, 24, 1, true), shadeM);
-  s.material.side = THREE.DoubleSide; s.position.y = h - 0.15; g.add(s);
-  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+function shadeGeo(kind, w, h) {
+  if (kind === "globe") return new THREE.SphereGeometry(w / 2, 32, 20);
+  if (kind === "cone") return new THREE.CylinderGeometry(w * 0.12, w / 2, h, 32, 1, true);
+  if (kind === "bell") return new THREE.LatheGeometry([[w / 2, 0], [w * 0.44, h * 0.25], [w * 0.3, h * 0.65], [w * 0.16, h], [0.01, h]].map(([a, b]) => new THREE.Vector2(a, b)), 32);
+  if (kind === "drum") return new THREE.CylinderGeometry(w / 2, w / 2, h, 32, 1, true);
+  const dome = new THREE.SphereGeometry(w / 2, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1, h / (w / 2), 1); return dome;
+}
+function lampShadeMat(it, st) { return makeMat(it.colour, st.material === "glass" || st.material === "metal" || st.material === "rattan" ? st.material : "paper"); }
+function buildLamp(g, it, mats, st) {
+  const w = it.w / 100, h = it.h / 100, sh = Math.min(0.35, h * 0.25);
+  const stem = makeMat((it.colour2 ?? mats.dark.color.getStyle()), "metal");
+  cyl(g, stem, 0, 0, 0, 0.03, w * 0.35, w * 0.35, 24);
+  cyl(g, stem, 0, 0, 0.03, h - sh * 0.6, 0.012, 0.012, 8);
+  const m = mesh(g, shadeGeo(st.shade, w, sh), lampShadeMat(it, st), st.shade === "globe" || st.shade === "dome" || st.shade === "bell" ? h - sh : h - sh / 2);
+  m.castShadow = false;
   return [[-w / 2, -w / 2, w / 2, w / 2]];
 }
-function mesh(g, geo, mat, y) { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = true; m.receiveShadow = true; g.add(m); return m; }
-function buildTableLamp(g, it, { main, dark }) {
-  const w = it.w / 100, h = it.h / 100;
-  mesh(g, new THREE.CylinderGeometry(w * 0.3, w * 0.34, 0.03, 24), dark ?? main, 0.015);
-  mesh(g, new THREE.CylinderGeometry(0.008, 0.008, h * 0.62, 8), dark ?? main, h * 0.31);
-  const sh = mesh(g, new THREE.CylinderGeometry(w * 0.32, w / 2, h * 0.4, 28, 1, true), shadeMat(), h * 0.8);
-  sh.castShadow = false;
+function buildTableLamp(g, it, mats, st) {
+  const w = it.w / 100, h = it.h / 100, sh = h * 0.42;
+  const baseMat = makeMat(it.colour2 ?? it.colour, st.material === "paper" ? "ceramic" : st.material);
+  if (st.material === "metal") { cyl(g, baseMat, 0, 0, 0, 0.025, w * 0.3, w * 0.32, 24); cyl(g, baseMat, 0, 0, 0.025, h - sh * 0.7, 0.008, 0.008, 8); }
+  else mesh(g, new THREE.LatheGeometry([[0.001, 0], [w * 0.22, 0], [w * 0.3, h * 0.2], [w * 0.26, h * 0.42], [w * 0.08, h * 0.56], [0.001, h * 0.58]].map(([a, b]) => new THREE.Vector2(a, b)), 28), baseMat, 0);
+  const m = mesh(g, shadeGeo(st.shade, w, sh), makeMat(it.colour2 ? it.colour : "#f3ead8", st.material === "glass" ? "glass" : "paper"),
+    st.shade === "globe" ? h - w / 2 : st.shade === "dome" || st.shade === "bell" ? h - sh : h - sh / 2);
+  m.castShadow = false;
   return [[-w / 2, -w / 2, w / 2, w / 2]];
 }
-function buildPendant(g, it, { main, dark }) {
+function buildPendant(g, it, mats, st) {
   // local y = 0 is the bottom of the shade; the cord runs up to the ceiling
   const w = it.w / 100, h = it.h / 100;
   const cord = Math.max(0, CEIL - elevM(it) - h);
-  const dome = new THREE.SphereGeometry(w / 2, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-  dome.scale(1, h / (w / 2), 1);
-  const sh = mesh(g, dome, main, 0); sh.material = main.clone(); sh.material.side = THREE.DoubleSide;
-  mesh(g, new THREE.SphereGeometry(Math.min(0.04, w * 0.12), 12, 8), new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffd98a, emissiveIntensity: 1.2 }), h * 0.15).castShadow = false;
-  if (cord > 0.005) mesh(g, new THREE.CylinderGeometry(0.004, 0.004, cord, 6), dark ?? main, h + cord / 2).castShadow = false;
-  mesh(g, new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16), dark ?? main, h + cord - 0.01);
+  const sh = mesh(g, shadeGeo(st.shade, w, h), lampShadeMat(it, st), st.shade === "drum" || st.shade === "cone" ? h / 2 : st.shade === "globe" ? h / 2 : 0);
+  if (st.shade === "globe") sh.scale.y = h / w;
+  mesh(g, new THREE.SphereGeometry(Math.min(0.04, w * 0.12), 12, 8), new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffd98a, emissiveIntensity: 1.2 }), h * 0.3).castShadow = false;
+  const cordMat = makeMat(it.colour2 ?? "#2b2b2d", "plastic");
+  if (cord > 0.005) mesh(g, new THREE.CylinderGeometry(0.004, 0.004, cord, 6), cordMat, h + cord / 2).castShadow = false;
+  mesh(g, new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16), cordMat, h + cord - 0.01);
   return [[-w / 2, -w / 2, w / 2, w / 2]];
 }
-function buildPlant(g, it, { main }) {
+function buildPlant(g, it, mats, st) {
   const w = it.w / 100, h = it.h / 100, potH = Math.min(h * 0.35, w * 0.9);
-  mesh(g, new THREE.CylinderGeometry(w * 0.42, w * 0.32, potH, 24), main, potH / 2);
-  const leaf = new THREE.MeshStandardMaterial({ color: 0x4f7a45, roughness: 0.9, flatShading: true, clippingPlanes: [cutPlane] });
-  const r = Math.max(w * 0.5, 0.06), crown = h - potH;
-  for (const [dx, dy, dz, k] of [[0, 0.55, 0, 1], [0.35, 0.3, 0.1, 0.75], [-0.3, 0.35, -0.15, 0.7], [0.05, 0.85, 0.2, 0.6]]) {
-    const b = mesh(g, new THREE.IcosahedronGeometry(r * k, 0), leaf, potH + crown * dy);
-    b.position.x = dx * r; b.position.z = dz * r; b.scale.y = Math.max(0.6, crown / (r * 2));
+  mesh(g, new THREE.CylinderGeometry(w * 0.42, w * 0.32, potH, 24), makeMat(it.colour, st.material), potH / 2);
+  const leaf = new THREE.MeshStandardMaterial({ color: 0x4f7a45, roughness: 0.85, flatShading: true, side: THREE.DoubleSide, clippingPlanes: [cutPlane] });
+  const crown = h - potH, r = Math.max(w * 0.5, 0.06);
+  if (st.foliage === "upright") {
+    for (let k = 0; k < 9; k++) {
+      const a = k * 2.4, bl = mesh(g, new THREE.PlaneGeometry(w * 0.16, crown * (0.7 + 0.3 * Math.sin(k))), leaf, potH + crown * 0.4);
+      bl.position.x = Math.cos(a) * w * 0.12; bl.position.z = Math.sin(a) * w * 0.12; bl.rotation.y = a; bl.rotation.z = Math.cos(a) * 0.12;
+    }
+  } else {
+    const blobs = st.foliage === "bushy" ? [[0, 0.5, 0, 1.1], [0.4, 0.4, 0.2, 0.8], [-0.4, 0.45, -0.1, 0.8], [0.1, 0.75, -0.3, 0.7], [-0.2, 0.7, 0.35, 0.7]]
+      : [[0, 0.55, 0, 1], [0.35, 0.3, 0.1, 0.75], [-0.3, 0.35, -0.15, 0.7], [0.05, 0.85, 0.2, 0.6]];
+    for (const [dx, dy, dz, k] of blobs) {
+      const b = mesh(g, new THREE.IcosahedronGeometry(r * k, 0), leaf, potH + crown * dy);
+      b.position.x = dx * r; b.position.z = dz * r; b.scale.y = Math.max(0.6, crown / (r * 2));
+    }
   }
   return [[-w / 2, -w / 2, w / 2, w / 2]];
 }
-function buildDeco(g, it, { main }) {
+function buildDeco(g, it, mats, st) {
   const w = it.w / 100, d = it.d / 100, h = it.h / 100;
-  if (/frame/.test(it.slug ?? "") || d < w * 0.3) { blk(g, main, -w / 2, w / 2, 0, h, -d / 2, d / 2); return [[-w / 2, -d / 2, w / 2, d / 2]]; }
-  // a turned profile: bowl when it's low and wide, vase otherwise
-  const pts = h < w * 0.6
-    ? [[0, 0], [w * 0.3, 0], [w * 0.45, h * 0.5], [w * 0.5, h], [w * 0.46, h]]
-    : [[0, 0], [w * 0.32, 0], [w * 0.5, h * 0.35], [w * 0.36, h * 0.8], [w * 0.28, h], [w * 0.24, h]];
-  const m = mesh(g, new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), 32), main, 0);
-  m.material = main.clone(); m.material.side = THREE.DoubleSide;
+  let prof = st.profile;
+  if (!prof || prof === "auto") prof = /frame/.test(it.slug ?? "") || d < w * 0.3 ? "frame" : h < w * 0.6 ? "bowl" : "vase-tall";
+  const m = makeMat(it.colour, st.material);
+  if (prof === "frame") { blk(g, m, -w / 2, w / 2, 0, h, -d / 2, d / 2); blk(g, makeMat("#f2f0ea", "paper"), -w / 2 + 0.02, w / 2 - 0.02, 0.02, h - 0.02, d / 2 - 0.001, d / 2 + 0.001); return [[-w / 2, -d / 2, w / 2, d / 2]]; }
+  const P = {
+    "vase-tall": [[0, 0], [0.32, 0], [0.5, 0.35], [0.36, 0.8], [0.28, 1], [0.24, 1]],
+    "vase-round": [[0, 0], [0.3, 0], [0.5, 0.4], [0.42, 0.75], [0.2, 0.9], [0.22, 1], [0.18, 1]],
+    "bottle": [[0, 0], [0.45, 0], [0.5, 0.5], [0.4, 0.62], [0.14, 0.75], [0.12, 1], [0.1, 1]],
+    "cylinder": [[0, 0], [0.5, 0], [0.5, 1], [0.46, 1]],
+    "bowl": [[0, 0], [0.3, 0], [0.45, 0.5], [0.5, 1], [0.46, 1]],
+  }[prof] ?? [[0, 0], [0.5, 0], [0.5, 1]];
+  const v = mesh(g, new THREE.LatheGeometry(P.map(([a, b]) => new THREE.Vector2(a * w, b * h)), 32), m, 0);
+  v.material.side = THREE.DoubleSide;
   return [[-w / 2, -d / 2, w / 2, d / 2]];
 }
-function shadeMat() { return new THREE.MeshStandardMaterial({ color: 0xf6efe1, emissive: 0x6b5a3a, roughness: 1, side: THREE.DoubleSide, clippingPlanes: [cutPlane] }); }
 function buildItem(it) {
   const g = new THREE.Group();
-  const main = makeMat(it.colour);
-  const mats = { main, dark: it.colour2 ? makeMat(it.colour2) : makeMat(shade(it.colour, -0.25).getStyle()),
-    cush: makeMat(shade(it.colour, 0.05).getStyle()) };
+  const st = styleOf(it);
+  const mat = st.material ?? "painted";
+  const main = makeMat(it.colour, mat);
+  const darkHex = it.colour2 ?? shade(it.colour, -0.25).getStyle();
+  const mats = { main, dark: makeMat(darkHex, mat === "fabric" || mat === "velvet" || mat === "leather" ? "wood" : mat),
+    cush: makeMat(shade(it.colour, 0.04).getStyle(), mat) };
   const fn = { sofa: buildSofa, armchair: buildSofa, bed: buildBed, table: buildTable, desk: buildTable, chair: buildChair,
     storage: buildStorage, shelving: buildStorage, rug: buildRug, lamp: buildLamp, tablelamp: buildTableLamp,
     pendant: buildPendant, plant: buildPlant, deco: buildDeco }[it.type];
   let rects;
-  if (fn) rects = fn(g, it, mats);
+  if (fn) rects = fn(g, it, mats, st);
   else { blk(g, main, -it.w / 200, it.w / 200, 0, it.h / 100, -it.d / 200, it.d / 200); rects = [[-it.w / 200, -it.d / 200, it.w / 200, it.d / 200]]; }
   g.userData.rects = rects;
   g.userData.itemId = it.id;
   // hanging lamps stay visible above the section cut
-  if (it.type === "pendant") g.traverse((o) => { if (o.material) o.material.clippingPlanes = []; });
+  if (it.type === "pendant") g.traverse((o) => { if (o.material) { o.material = o.material.clone(); o.material.clippingPlanes = []; } });
   g.traverse((o) => { o.userData.itemId = it.id; });
   return g;
 }
@@ -1137,7 +1385,11 @@ function placeGroup(it) {
   g.position.set(it.x, elevM(it), it.z); g.rotation.y = it.rot * Math.PI / 180;
 }
 function tint(g, bad) {
-  g.traverse((o) => { if (o.isMesh && o.material.emissive) { o.material.emissive.set(bad ? 0x8f1d1d : 0x000000); o.material.emissiveIntensity = bad ? 0.55 : 1; } });
+  g?.traverse((o) => {
+    const m = o.isMesh && o.material; if (!m?.emissive) return;
+    if (!m.userData.em) m.userData.em = { c: m.emissive.getHex(), i: m.emissiveIntensity };
+    if (bad) { m.emissive.set(0x8f1d1d); m.emissiveIntensity = 0.55; } else { m.emissive.setHex(m.userData.em.c); m.emissiveIntensity = m.userData.em.i; }
+  });
 }
 function statusOf(it) {
   if (it.type === "rug") return { cls: "ok", text: "Fits" };
@@ -1170,7 +1422,8 @@ function renderList() {
       <span class="icons"><button title="Rotate 90°" aria-label="Rotate 90 degrees" data-a="rot">⟳</button><button title="Edit size" aria-label="Edit size" data-a="edit">✎</button><button title="Duplicate" aria-label="Duplicate" data-a="dup">⧉</button><button title="Remove" aria-label="Remove" data-a="del">✕</button></span>
       <span class="meta"><span class="n"></span><span class="chip ${st.cls}">${st.text}</span>${it.example ? '<span class="chip info">Example</span>' : ""}<span class="by"></span></span>`;
     if (shared && it.by) { const b = li.querySelector(".by"); b.dataset.uid = it.by; b.dataset.prefix = "moved by "; b.textContent = nameCache.has(it.by) ? "moved by " + nameCache.get(it.by) : ""; }
-    li.querySelector(".sw").style.background = it.colour;
+    if (it.photo) { const img = document.createElement("img"); img.className = "sw"; img.alt = ""; img.src = it.photo; li.querySelector(".sw").replaceWith(img); li.classList.add("has-photo"); }
+    else li.querySelector(".sw").style.background = it.colour;
     li.querySelector(".nm").textContent = `${it.family} · ${it.desc}`;
     li.querySelector(".nm").title = `${it.family} ${it.desc}`;
     li.querySelector(".n").textContent = sizeText(it) + (heightText(it) ? ` · ${heightText(it)}` : "");
@@ -1266,7 +1519,7 @@ function syncMountRow() {
   $("dElevLbl").textContent = m === "ceiling" ? "Cable cm" : "Height cm";
   $("dElev").title = m === "ceiling" ? "From the ceiling to the top of the lamp" : "From the floor to the bottom of the piece";
 }
-$("dType").onchange = () => { syncChaiseRow(); $("dMount").value = defaultMount($("dType").value); syncMountRow(); setMountInput(); };
+$("dType").onchange = () => { if (draftData) renderStyleGrid({ ...draftData, type: $("dType").value, style: {} }); syncChaiseRow(); $("dMount").value = defaultMount($("dType").value); syncMountRow(); setMountInput(); };
 $("dMount").onchange = () => { syncMountRow(); setMountInput(); };
 function setMountInput() {
   const m = $("dMount").value;
@@ -1278,6 +1531,136 @@ function setSrcChip(src, note) {
   $("dSrc").className = "chip " + cls; $("dSrc").textContent = text;
   $("dNote").textContent = note ?? "";
 }
+// ---- style controls (filled from the photo, a catalogue preset or by hand)
+const STYLE_LABELS = { material: "Material", legs: "Legs", legHeight: "Leg height cm", arms: "Arms", back: "Back", seatCushions: "Seat cushions",
+  headboard: "Headboard", top: "Top", topThick: "Top thickness cm", fronts: "Fronts", handles: "Handles", shade: "Shade", profile: "Shape", foliage: "Foliage" };
+const NUMERIC = { legHeight: [0, 60], topThick: [1, 15], seatCushions: [1, 6] };
+const pretty = (v) => String(v).replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
+function renderStyleGrid(d) {
+  const st = styleOf(d), grid = $("dStyleGrid");
+  grid.innerHTML = "";
+  for (const f of STYLE_FIELDS[d.type] ?? ["material"]) {
+    const lab = document.createElement("label"); lab.textContent = STYLE_LABELS[f];
+    let el;
+    if (NUMERIC[f]) { el = document.createElement("input"); el.type = "number"; el.min = NUMERIC[f][0]; el.max = NUMERIC[f][1]; el.step = 1; el.value = st[f] ?? ""; }
+    else { el = document.createElement("select"); for (const v of STYLE_OPTIONS[f]) { const o = document.createElement("option"); o.value = v; o.textContent = pretty(v); el.appendChild(o); } el.value = st[f] ?? STYLE_OPTIONS[f][0]; }
+    el.id = "st-" + f; el.dataset.f = f;
+    lab.appendChild(el); grid.appendChild(lab);
+  }
+  const lab = document.createElement("label"); lab.textContent = "Second colour (legs, frame, base)";
+  const c2 = document.createElement("input"); c2.type = "color"; c2.id = "dColour2"; c2.value = d.colour2 ?? shade(d.colour ?? "#999999", -0.25).getHexString().replace(/^/, "#");
+  c2.style.cssText = "width:44px;height:30px;padding:2px";
+  lab.appendChild(c2); grid.appendChild(lab);
+}
+function readStyle() {
+  const st = {};
+  for (const el of $("dStyleGrid").querySelectorAll("[data-f]")) {
+    const f = el.dataset.f;
+    if (NUMERIC[f]) { const n = Number(el.value); if (el.value !== "" && Number.isFinite(n)) st[f] = Math.min(NUMERIC[f][1], Math.max(NUMERIC[f][0], Math.round(n))); }
+    else if (STYLE_OPTIONS[f].includes(el.value)) st[f] = el.value;
+  }
+  return st;
+}
+// keep only values the builders know
+function cleanStyle(r, type) {
+  const st = {};
+  for (const f of STYLE_FIELDS[type] ?? ["material"]) {
+    const v = r?.[f];
+    if (NUMERIC[f]) { const n = Number(v); if (Number.isFinite(n) && n >= 0) st[f] = Math.min(NUMERIC[f][1], Math.max(NUMERIC[f][0], Math.round(n))); }
+    else if (typeof v === "string" && STYLE_OPTIONS[f].includes(v)) st[f] = v;
+  }
+  return st;
+}
+const HEX = /^#[0-9a-f]{6}$/i;
+
+// ---- product photo: thumbnail + local colours at once, then Claude reads the style
+function loadImage(file) {
+  return new Promise((res, rej) => { const url = URL.createObjectURL(file); const im = new Image(); im.onload = () => { URL.revokeObjectURL(url); res(im); }; im.onerror = rej; im.src = url; });
+}
+function scaled(im, max) {
+  const k = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight));
+  const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k));
+  const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+  return c;
+}
+// the two most common non-background colours (IKEA photos sit on white or light grey)
+function dominantColours(canvas) {
+  const small = document.createElement("canvas"); small.width = 64; small.height = Math.max(1, Math.round(64 * canvas.height / canvas.width));
+  const x = small.getContext("2d"); x.drawImage(canvas, 0, 0, small.width, small.height);
+  const px = x.getImageData(0, 0, small.width, small.height).data, bins = new Map();
+  for (let i = 0; i < px.length; i += 4) {
+    const [r, g, b] = [px[i], px[i + 1], px[i + 2]];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mn > 222 && mx - mn < 16) continue; // background
+    const key = (r >> 4) << 8 | (g >> 4) << 4 | (b >> 4);
+    const e = bins.get(key) ?? { n: 0, r: 0, g: 0, b: 0 }; e.n++; e.r += r; e.g += g; e.b += b; bins.set(key, e);
+  }
+  const top = [...bins.values()].sort((a, b) => b.n - a.n).map((e) => [e.r / e.n, e.g / e.n, e.b / e.n]);
+  const hex = (c) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  const first = top[0]; if (!first) return [];
+  const second = top.find((c) => Math.hypot(c[0] - first[0], c[1] - first[1], c[2] - first[2]) > 70);
+  return [hex(first), second ? hex(second) : null];
+}
+let photoSeq = 0;
+async function handlePhoto(file) {
+  if (!file || !/^image\//.test(file.type)) { $("dStyleStatus").textContent = "That isn't an image. Copy the product photo itself, or pick a .jpg, .png or .webp file."; return; }
+  const seq = ++photoSeq;
+  let im;
+  try { im = await loadImage(file); } catch { $("dStyleStatus").textContent = "Couldn't read that image. Try another copy or file."; return; }
+  const thumbC = scaled(im, 160), big = scaled(im, 768);
+  draftData.photo = thumbC.toDataURL("image/jpeg", 0.72);
+  $("dPhoto").src = draftData.photo; $("dPhoto").hidden = false;
+  const [c1, c2] = dominantColours(big);
+  if (c1) { $("dColour").value = c1; draftData.colour = c1; }
+  if (c2 && $("dColour2")) { $("dColour2").value = c2; draftData.colour2 = c2; }
+  const sample = await getSample();
+  const lim = sample ? await sample.limits().catch(() => null) : null;
+  if (!sample || sampleBlocked || !lim?.images) {
+    $("dStyleStatus").textContent = "Colours taken from the photo. Set the rest under Style below."; $("dStyleBox").open = true; return;
+  }
+  $("dStyleStatus").textContent = "Colours taken from the photo. Asking Claude to read the style… This uses your Claude usage.";
+  const blob = await new Promise((r) => big.toBlob(r, "image/jpeg", 0.86));
+  const type = $("dType").value;
+  const fields = STYLE_FIELDS[type] ?? ["material"];
+  const keys = fields.map((f) => NUMERIC[f] ? `"${f}": number` : `"${f}": one of ${JSON.stringify(STYLE_OPTIONS[f])}`).join(",\n ");
+  const prompt = `The image is the product photo of an IKEA item: ${draftData.family} ${draftData.desc} (built as a ${SHAPES[type]?.label ?? type}, about ${$("dW").value}×${$("dD").value}×${$("dH").value} cm).
+I build a simple 3D model of it from a few parameters. Look only at the product, not the background, props or people.
+Reply with only this JSON (leave out a key if you can't tell):
+{"colour": "#rrggbb, the main visible surface (upholstery, wood, body or shade)",
+ "colour2": "#rrggbb, the second colour (legs, frame, base, cord), or the same as colour",
+ ${keys},
+ "note": "at most 12 words on what you saw"}
+legHeight = visible leg height under the body in cm; seatCushions = number of separate seat cushions; topThick = tabletop thickness in cm.`;
+  try {
+    const r = await sample.json(prompt, { images: blob, modelTier: "default", cache: { gcTime: 86400000 } });
+    if (seq !== photoSeq || $("draft").hidden) return;
+    if (HEX.test(r?.colour ?? "")) { $("dColour").value = r.colour; draftData.colour = r.colour; }
+    if (HEX.test(r?.colour2 ?? "")) draftData.colour2 = r.colour2;
+    draftData.style = { ...(draftData.style ?? {}), ...cleanStyle(r, type) };
+    renderStyleGrid({ ...draftData, type });
+    $("dStyleBox").open = true;
+    $("dStyleStatus").textContent = "Style read from the photo" + (r?.note ? `: ${String(r.note).slice(0, 100).replace(/[.\s]+$/, "")}.` : ".") + " Adjust anything under Style.";
+  } catch (e) {
+    if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e?.code)) sampleBlocked = true;
+    if (e?.code === "cancelled") return;
+    $("dStyleStatus").textContent = e?.code === "rate_limited" ? "Claude is busy; colours come from the photo. Set the rest under Style, or try the photo again later."
+      : e?.code === "image_rejected" ? "Claude couldn't use that image. Try a different copy of the photo."
+      : "Colours come from the photo. Claude couldn't read the style, so set it under Style below.";
+    $("dStyleBox").open = true;
+  }
+}
+$("dPhotoBtn").onclick = () => $("dPhotoFile").click();
+$("dPhotoFile").onchange = (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handlePhoto(f); };
+document.addEventListener("paste", (e) => {
+  if ($("draft").hidden) return;
+  const f = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+  if (f) { e.preventDefault(); handlePhoto(f); }
+});
+const pbox = $("dPhotoBox");
+pbox.addEventListener("dragover", (e) => { e.preventDefault(); pbox.classList.add("over"); });
+pbox.addEventListener("dragleave", () => pbox.classList.remove("over"));
+pbox.addEventListener("drop", (e) => { e.preventDefault(); pbox.classList.remove("over"); const f = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith("image/")); if (f) handlePhoto(f); });
+
 function openDraft(d, mode) {
   draftData = { ...d }; editingId = mode === "edit" ? d.id : null;
   $("dFam").textContent = d.family;
@@ -1290,6 +1673,11 @@ function openDraft(d, mode) {
   $("dPlace").textContent = mode === "edit" ? "Save changes" : "Place in model";
   setSrcChip(d.src, d.note);
   syncChaiseRow();
+  photoSeq++; // drop answers meant for a previous card
+  $("dPhoto").hidden = !d.photo; if (d.photo) $("dPhoto").src = d.photo;
+  $("dStyleStatus").textContent = d.photo ? "Style taken from this photo. Add another photo to redo it." : "";
+  renderStyleGrid(d);
+  $("dStyleBox").open = false;
   $("dMount").value = d.mount ?? defaultMount(d.type);
   syncMountRow(); setMountInput();
   if (d.mount === "custom") $("dElev").value = Math.round(d.elev ?? 0);
@@ -1300,7 +1688,7 @@ function readDraft() {
   const n = (id, lo, hi) => Math.min(hi, Math.max(lo, Math.round(Number($(id).value) || 0)));
   const d = { ...draftData, type: $("dType").value, w: n("dW", 5, 600), d: n("dD", 5, 600), h: n("dH", 1, 300),
     chaise: $("dType").value === "sofa" ? n("dCD", 0, 300) : 0, chaiseSide: $("dCS").value, colour: $("dColour").value,
-    mount: $("dMount").value };
+    mount: $("dMount").value, style: readStyle(), colour2: $("dColour2")?.value ?? draftData.colour2 };
   if (d.mount === "custom") d.elev = n("dElev", 0, 250);
   if (d.mount === "ceiling") d.drop = n("dElev", 0, 250);
   if (d.w !== draftData.w || d.d !== draftData.d || d.h !== draftData.h || d.chaise !== (draftData.chaise || 0)) d.src = "manual";
@@ -1331,7 +1719,7 @@ async function addFromLink(text) {
     openDraft({ ...d, note: `${why} A typical size is filled in; enter the real size from the IKEA page.` }, "new");
     return;
   }
-  openDraft({ ...d, type: r.type ?? d.type, w: r.w, d: r.d, h: r.h, chaise: r.chaise || d.chaise,
+  openDraft({ ...d, type: r.type ?? d.type, w: r.w, d: r.d, h: r.h, chaise: r.chaise || d.chaise, style: cleanStyle(r.style, r.type ?? d.type),
     src: r.confident ? "claudeKnown" : "claude",
     note: (r.confident ? "Claude recalled this product's size. " : "Claude estimated this size. ") + "Check it on the IKEA page before relying on a tight fit." + (r.note ? ` (${r.note})` : "") }, "new");
 }
@@ -1493,9 +1881,10 @@ document.addEventListener("keydown", (e) => {
 // ---- sync: one shared layout in the artifact's database, people live in the room.
 // Without a Claude viewer (a local file) everything stays in this browser.
 const ARTIFACT_URL = "https://claude.ai/artifact/AU4Q1joHJ5591a2iKdLMtk";
-const DOC_FIELDS = ["id", "url", "slug", "article", "family", "desc", "type", "w", "d", "h", "chaise", "chaiseSide", "mount", "elev", "drop",
+const DOC_FIELDS = ["id", "url", "slug", "article", "family", "desc", "type", "w", "d", "h", "chaise", "chaiseSide", "mount", "elev", "drop", "style", "photo",
   "colour", "colour2", "x", "z", "rot", "src", "note", "example", "addedBy", "createdAt", "by", "updatedAt"];
 const GEOM_FIELDS = ["type", "w", "d", "h", "chaise", "chaiseSide", "colour", "colour2", "slug", "mount", "drop"];
+const sameStyle = (a, b) => JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
 let db = null, room = null, userNs = null, myId = null, canWrite = true, shared = false;
 let layouts = [], highlightLayout = null;
 const nameCache = new Map(); // user id -> display name (never stored)
@@ -1570,7 +1959,7 @@ function applyFurniture(snap) {
     const next = { ...ch.doc.data(), id };
     const cur = items.find((i) => i.id === id);
     if (!cur) { items.push(next); refreshItem(next); continue; }
-    const geom = GEOM_FIELDS.some((k) => cur[k] !== next[k]) || (cur.type === "pendant" && cur.elev !== next.elev);
+    const geom = GEOM_FIELDS.some((k) => cur[k] !== next[k]) || !sameStyle(cur.style, next.style) || (cur.type === "pendant" && cur.elev !== next.elev);
     Object.assign(cur, next);
     if (geom) refreshItem(cur); else placeGroup(cur);
   }
