@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Lemgrubenstrasse 8 · L08.02</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -115,6 +116,10 @@ details.style summary { cursor: pointer; font-size: 12px; font-weight: 500; }
 .styleGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
 .styleGrid label { display: grid; gap: 3px; font-size: 11px; color: var(--muted); }
 .styleGrid input[type=number] { width: 100%; font-family: var(--f-mono); font-size: 12.5px; }
+.ocr { display: grid; gap: 6px; margin-top: 8px; }
+.numchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.numchip { font-family: var(--f-mono); font-size: 12.5px; padding: 3px 9px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+.numchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .imgs { display: flex; gap: 6px; flex-wrap: wrap; }
 .imgs figure { margin: 0; position: relative; width: 56px; }
 .imgs img { width: 56px; height: 56px; object-fit: contain; background: #fff; border: 1px solid var(--line); display: block; }
@@ -251,6 +256,10 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
           <label class="field" style="margin-top:8px">Paste the Measurements list from the IKEA page
             <textarea id="dMeasText" rows="3" placeholder="Width: 336 cm&#10;Depth: 98 cm&#10;Seat height: 48 cm"></textarea></label>
           <p class="status" id="dMeasStatus" role="status"></p>
+          <div class="ocr" id="dOcr" hidden>
+            <p class="note" id="dOcrHint">Click a number, then the box it belongs to.</p>
+            <div class="numchips" id="dOcrChips"></div>
+          </div>
           <div class="styleGrid" id="dMeasGrid"></div>
           <p class="note" id="dMeasNone" hidden>Width, depth and height above are all this shape uses.</p>
         </details>
@@ -675,7 +684,7 @@ function parseIkeaUrl(text) {
   const raw = decodeURIComponent((pi >= 0 ? segs[pi + 1] : segs.at(-1)) || "").toLowerCase();
   if (!raw) return null;
   const m = raw.match(/^(.*?)-?(s?\d{8})$/);
-  const slug = (m ? m[1] : raw).normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const slug = (m ? m[1] : raw).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const article = m ? m[2] : null;
   const words = slug.split("-");
   const family = words[0].toUpperCase();
@@ -1780,14 +1789,136 @@ async function handlePhoto(file) {
   const sample = await getSample();
   const lim = sample ? await sample.limits().catch(() => null) : null;
   if (!sample || sampleBlocked || !lim?.images) {
-    $("dStyleStatus").textContent = drawing ? "Claude isn't available here to read drawings. Paste the Measurements list below instead."
-      : "Colours taken from the photo. Set the rest under Style below.";
-    (drawing ? $("dMeasBox") : $("dStyleBox")).open = true; return;
+    // No image reading through Claude in this view: read drawings in the page instead.
+    if (drawing) return readDrawingLocally(big, sample && !sampleBlocked ? sample : null);
+    $("dStyleStatus").textContent = `Colours taken from the photo. ${whyNoImages(sample, lim)} so set the style below.`;
+    $("dStyleBox").open = true; return;
   }
   $("dStyleStatus").textContent = "Add more photos or drawings now if you have them…";
   clearTimeout(askTimer);
   askTimer = setTimeout(() => askClaudeAboutImages(sample, Math.min(4, lim.images.maxCount ?? 4)), 900);
 }
+function whyNoImages(sample, lim) {
+  if (!sample) return "Claude isn't connected to this page here (it only is on claude.ai),";
+  if (sampleBlocked) return "Claude was declined for this page in this visit,";
+  if (!lim?.images) return "This Claude view can't look at images,";
+  return "Claude can't read images right now,";
+}
+
+// ---- reading drawings in the page: OCR for the numbers, then Claude (text only) or the viewer assigns them
+let ocrWorkerP = null;
+function loadScript(src) {
+  return new Promise((res, rej) => { const el = document.createElement("script"); el.src = src; el.onload = res; el.onerror = () => rej(new Error("load " + src)); document.head.appendChild(el); });
+}
+function getOcr() {
+  if (!ocrWorkerP) ocrWorkerP = (async () => {
+    const base = new URL("vendor/ocr/", location.href).href;
+    if (!window.Tesseract) await loadScript(base + "tesseract.min.js");
+    // the English model ships gzipped under a .wasm name (a type artifacts serve); tesseract gunzips it itself
+    const resp = await fetch(base + "eng-traineddata-gz.wasm");
+    if (!resp.ok) throw new Error("model " + resp.status);
+    const data = new Uint8Array(await resp.arrayBuffer());
+    const w = await window.Tesseract.createWorker([{ code: "eng", data }], 1, { workerPath: base + "worker.min.js",
+      corePath: base + "tesseract-core-lstm.wasm.js", logger: () => {} });
+    await w.setParameters({ tessedit_char_whitelist: "0123456789.,cm/\"' " });
+    return w;
+  })().catch((e) => { ocrWorkerP = null; throw e; });
+  ocrWorkerP.catch(() => {});
+  return ocrWorkerP;
+}
+function rotated(canvas) {
+  const c = document.createElement("canvas"); c.width = canvas.height; c.height = canvas.width;
+  const x = c.getContext("2d"); x.translate(c.width, 0); x.rotate(Math.PI / 2); x.drawImage(canvas, 0, 0);
+  return c;
+}
+// numbers printed in the drawing, with where they sit (0..1) and whether the text runs vertically
+async function ocrNumbers(canvas) {
+  const w = await getOcr();
+  const found = [];
+  for (const vertical of [false, true]) {
+    const c = vertical ? rotated(canvas) : canvas;
+    const { data } = await w.recognize(c);
+    for (const wd of data.words ?? []) {
+      const t = wd.text.replace(/\s/g, "");
+      if (/["'\/]/.test(t) || wd.confidence < 55) continue;          // inches and fractions
+      const m = t.match(/^(\d{1,3}(?:[.,]\d)?)(cm)?$/i); if (!m) continue;
+      const v = parseFloat(m[1].replace(",", ".")); if (!(v >= 2 && v <= 600)) continue;
+      const b = wd.bbox, cx = (b.x0 + b.x1) / 2 / c.width, cy = (b.y0 + b.y1) / 2 / c.height;
+      // map the rotated frame back to the original drawing
+      const [x, y] = vertical ? [cy, 1 - cx] : [cx, cy];
+      if (!found.some((f) => f.v === v && Math.hypot(f.x - x, f.y - y) < 0.05)) found.push({ v, x: +x.toFixed(3), y: +y.toFixed(3), vertical });
+    }
+  }
+  return found;
+}
+let ocrNums = [], armedNum = null, lastNumField = null;
+function renderOcrChips() {
+  const box = $("dOcr"); box.hidden = !ocrNums.length;
+  const list = $("dOcrChips"); list.innerHTML = "";
+  for (const n of [...ocrNums].sort((a, b) => b.v - a.v)) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "numchip";
+    b.textContent = `${n.v}${n.vertical ? " ↕" : ""}`; b.title = n.vertical ? "Printed vertically (often a height)" : "Printed horizontally";
+    b.setAttribute("aria-pressed", String(armedNum === n));
+    b.onclick = () => {
+      if (lastNumField && document.activeElement === lastNumField) { fillNumField(lastNumField, n.v); return; }
+      armedNum = armedNum === n ? null : n; renderOcrChips();
+      $("dOcrHint").textContent = armedNum ? `Now click the box ${armedNum.v} belongs to.` : "Click a number, then the box it belongs to.";
+    };
+    b.onmousedown = (e) => e.preventDefault(); // keep focus in the box being filled
+    list.appendChild(b);
+  }
+}
+function fillNumField(el, v) {
+  el.value = Math.round(v * 10) / 10;
+  el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true }));
+  if (["dW", "dD", "dH", "dCD"].includes(el.id) && draftData) { draftData.src = "plan"; setSrcChip("plan", draftData.note); }
+  armedNum = null; renderOcrChips(); $("dOcrHint").textContent = `Filled in ${el.closest("label")?.firstChild?.textContent?.trim() ?? "the box"}. Click another number to keep going.`;
+}
+$("draft").addEventListener("focusin", (e) => {
+  if (e.target.matches?.("input[type=number]")) { lastNumField = e.target; if (armedNum) fillNumField(e.target, armedNum.v); }
+});
+async function readDrawingLocally(canvas, textSample) {
+  $("dMeasBox").open = true;
+  $("dStyleStatus").textContent = "Reading the numbers in the drawing… (the first time takes a few seconds)";
+  const seq = ++photoSeq;
+  let nums;
+  try { nums = await Promise.race([ocrNumbers(canvas), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 45000))]); }
+  catch { $("dStyleStatus").textContent = "Couldn't load the drawing reader here. Paste the Measurements list below instead."; return; }
+  if (seq !== photoSeq || $("draft").hidden) return;
+  ocrNums = nums; armedNum = null; renderOcrChips();
+  if (!nums.length) { $("dStyleStatus").textContent = "No numbers found in that drawing. Try a larger copy of it, or paste the Measurements list below."; return; }
+  $("dOcrHint").textContent = "Click a number, then the box it belongs to.";
+  if (!textSample) {
+    $("dStyleStatus").textContent = `Found ${nums.length} number${nums.length === 1 ? "" : "s"} in the drawing. Assign them under Measurements below.`;
+    return;
+  }
+  // Claude can't see the image here, but it can match the numbers to dimensions from where they sit.
+  const type = $("dType").value;
+  const mkeys = (MEAS_FIELDS[type] ?? []).map((f) => `"${f}": cm`).join(", ");
+  $("dStyleStatus").textContent = `Found ${nums.length} numbers in the drawing. Asking Claude which is which…`;
+  const prompt = `An IKEA measurement drawing of ${draftData.family} ${draftData.desc} (built here as a ${SHAPES[type]?.label ?? type}) was read with OCR.
+These numbers (cm) were printed on it, with their position in the drawing (x, y from 0 at top-left to 1) and whether the text was vertical:
+${JSON.stringify(nums)}
+IKEA drawings usually show the front view and the side view with dimension lines: overall width under or over the front view, depth under the side view, heights printed vertically beside the views.
+Current size guess: ${$("dW").value}×${$("dD").value}×${$("dH").value} cm. Use only numbers from the list; leave out anything you can't tell.
+Reply with only this JSON: {"width_cm": number, "depth_cm": number, "height_cm": number, "chaise_depth_cm": number, "meas": {${mkeys}}, "note": "at most 12 words"}
+width = side to side seen from the front; depth = front to back (beds: length); legHeight = free height under the body.`;
+  try {
+    const r = await textSample.json(prompt, { modelTier: "default", cache: { gcTime: 86400000 } });
+    if (seq !== photoSeq || $("draft").hidden) return;
+    const pool = new Set(nums.map((n) => n.v));
+    const ok = (v) => (pool.has(Number(v)) ? Number(v) : undefined); // only numbers that are really in the drawing
+    const meas = {};
+    for (const k of MEAS_FIELDS[type] ?? []) { const v = ok(r?.meas?.[k]); if (v) meas[k] = v; }
+    const msg = applyMeasurements({ w: ok(r?.width_cm), d: ok(r?.depth_cm), h: ok(r?.height_cm), chaise: ok(r?.chaise_depth_cm), meas }, "From the drawing");
+    $("dStyleStatus").textContent = (msg || "Claude couldn't match the numbers.") + " Check them; click a number below to change a box.";
+  } catch (e) {
+    if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e?.code)) sampleBlocked = true;
+    if (e?.code === "cancelled") return;
+    $("dStyleStatus").textContent = `Found ${nums.length} numbers in the drawing. Assign them under Measurements below.`;
+  }
+}
+
 async function askClaudeAboutImages(sample, maxCount) {
   const seq = ++photoSeq;
   const imgs = draftImgs.slice(-maxCount);
@@ -1864,6 +1995,7 @@ function openDraft(d, mode) {
   syncChaiseRow();
   photoSeq++; clearTimeout(askTimer); draftImgs = []; renderImgs(); // drop images and answers meant for a previous card
   $("dMeasText").value = ""; $("dMeasStatus").textContent = ""; renderMeasGrid(d); $("dMeasBox").open = false;
+  ocrNums = []; armedNum = null; renderOcrChips();
   $("dPhoto").hidden = !d.photo; if (d.photo) $("dPhoto").src = d.photo;
   $("dStyleStatus").textContent = d.photo ? "Style taken from this photo. Add another photo to redo it." : "";
   renderStyleGrid(d);

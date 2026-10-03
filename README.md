@@ -40,8 +40,11 @@ shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, or a pla
   French) into a piece's *Measurements* section and it is read on the spot: width, depth, height, chaise
   depth, seat height and depth, armrest width and height, backrest height, free height under the
   furniture, head- and footboard height, tabletop thickness, shade size, pot height. Or paste the
-  measurement drawing (the image with dimension lines) next to the photo, and Claude reads the sizes
-  from it. The builders use these numbers for the model's proportions; VIMLE, KIVIK and MALM carry their
+  measurement drawing (the image with dimension lines) next to the photo. Where Claude can look at
+  images it reads the drawing directly. Everywhere else the page reads the drawing's numbers itself with
+  OCR (tesseract.js, bundled in `vendor/ocr/`, horizontal and vertical text), then either Claude matches
+  them to dimensions from their positions (text only, and only numbers that are really in the drawing
+  are accepted) or you click a number and then the box it belongs to. The builders use these numbers for the model's proportions; VIMLE, KIVIK and MALM carry their
   published measurements already.
 - **Height.** Each piece has a placement: *On the floor*, *On whatever is below it* (rests on the
   table, sideboard, bed, sofa seat or kitchen counter under it, or the floor if there's nothing),
