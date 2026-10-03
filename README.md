@@ -36,6 +36,13 @@ shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, or a pla
   handles, lamp shade, vase shape, plant foliage. The 3D model is rebuilt to match, and a small
   thumbnail of the photo is kept with the piece so collaborators see it too. Everything is editable
   under *Style*. Catalogue products start with a matching style preset.
+- **Measurements from the IKEA plans.** Paste the product's *Measurements* list (English, German or
+  French) into a piece's *Measurements* section and it is read on the spot: width, depth, height, chaise
+  depth, seat height and depth, armrest width and height, backrest height, free height under the
+  furniture, head- and footboard height, tabletop thickness, shade size, pot height. Or paste the
+  measurement drawing (the image with dimension lines) next to the photo, and Claude reads the sizes
+  from it. The builders use these numbers for the model's proportions; VIMLE, KIVIK and MALM carry their
+  published measurements already.
 - **Height.** Each piece has a placement: *On the floor*, *On whatever is below it* (rests on the
   table, sideboard, bed, sofa seat or kitchen counter under it, or the floor if there's nothing),
   *At a set height* (cm above the floor), or *Hanging from the ceiling* (cable length from the

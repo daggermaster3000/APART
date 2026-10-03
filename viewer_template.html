@@ -115,6 +115,13 @@ details.style summary { cursor: pointer; font-size: 12px; font-weight: 500; }
 .styleGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
 .styleGrid label { display: grid; gap: 3px; font-size: 11px; color: var(--muted); }
 .styleGrid input[type=number] { width: 100%; font-family: var(--f-mono); font-size: 12.5px; }
+.imgs { display: flex; gap: 6px; flex-wrap: wrap; }
+.imgs figure { margin: 0; position: relative; width: 56px; }
+.imgs img { width: 56px; height: 56px; object-fit: contain; background: #fff; border: 1px solid var(--line); display: block; }
+.imgs figcaption { font-size: 10.5px; color: var(--muted); text-align: center; }
+.imgs button { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--panel); color: var(--fg); font-size: 10px; line-height: 1; padding: 0; cursor: pointer; }
+textarea { font: inherit; font-size: 12.5px; color: var(--fg); background: var(--bg); border: 1px solid var(--line); padding: 6px 8px; resize: vertical; width: 100%; }
 .here { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
 .here .faces { display: flex; }
 .here img { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--panel); margin-left: -6px; background: var(--line); }
@@ -204,10 +211,12 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
         <div class="photo" id="dPhotoBox">
           <img id="dPhoto" alt="Product photo" hidden>
           <div class="stack" style="flex:1;min-width:0;gap:6px">
-            <div class="row2"><button class="btn ghost" type="button" id="dPhotoBtn">Add product photo</button>
-              <input type="file" id="dPhotoFile" accept="image/*" hidden></div>
-            <p class="note" id="dPhotoHelp">On the IKEA page, right-click the main photo, choose <em>Copy image</em>, then paste it here
-              (Ctrl+V or ⌘V). Or drop a saved image on this box. The model takes its colours and style from it.</p>
+            <div class="row2"><button class="btn ghost" type="button" id="dPhotoBtn">Add photos or drawings</button>
+              <input type="file" id="dPhotoFile" accept="image/*" multiple hidden></div>
+            <p class="note" id="dPhotoHelp">On the IKEA page, right-click the main photo and the measurement drawing (the one with
+              dimension lines), choose <em>Copy image</em> and paste each here (Ctrl+V or ⌘V), or drop saved images on this box.
+              Photos set the colours and style; drawings set the exact sizes.</p>
+            <div class="imgs" id="dImgs" hidden></div>
             <p class="status" id="dStyleStatus" role="status"></p>
           </div>
         </div>
@@ -238,6 +247,13 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
           <label class="field" style="flex:1">Chaise side
             <select id="dCS"><option value="right">Right, seen from the front</option><option value="left">Left, seen from the front</option></select></label>
         </div>
+        <details class="style" id="dMeasBox"><summary>Measurements</summary>
+          <label class="field" style="margin-top:8px">Paste the Measurements list from the IKEA page
+            <textarea id="dMeasText" rows="3" placeholder="Width: 336 cm&#10;Depth: 98 cm&#10;Seat height: 48 cm"></textarea></label>
+          <p class="status" id="dMeasStatus" role="status"></p>
+          <div class="styleGrid" id="dMeasGrid"></div>
+          <p class="note" id="dMeasNone" hidden>Width, depth and height above are all this shape uses.</p>
+        </details>
         <details class="style" id="dStyleBox"><summary>Style</summary>
           <div class="styleGrid" id="dStyleGrid"></div>
         </details>
@@ -583,10 +599,14 @@ for (const t of TABS) {
 // product link's slug, so every colour/fabric variant of a product matches.
 const CATALOG = [
   // `style` = how the product looks, used by the 3D builders until a photo says otherwise
-  { re: /vimle.*4-seat-sofa-with-chaise-longue/, type: "sofa", w: 336, d: 98, h: 83, chaise: 164, style: { material: "fabric", legs: "block", legHeight: 3, arms: "wide", back: "loose-cushions", seatCushions: 4 } },
-  { re: /vimle.*3-seat-sofa-with-chaise-longue/, type: "sofa", w: 252, d: 98, h: 83, chaise: 164, style: { material: "fabric", legs: "block", legHeight: 3, arms: "wide", back: "loose-cushions", seatCushions: 3 } },
-  { re: /kivik.*3-seat-sofa(?!-with)/, type: "sofa", w: 228, d: 95, h: 83, style: { material: "fabric", legs: "block", legHeight: 4, arms: "wide", back: "loose-cushions", seatCushions: 3 } },
-  { re: /malm.*bed-frame-high/, type: "bed", w: 176, d: 209, h: 100, note: "Size for the 160×200 cm mattress version.", style: { material: "wood", headboard: "panel", legs: "plinth" } },
+  { re: /vimle.*4-seat-sofa-with-chaise-longue/, type: "sofa", w: 336, d: 98, h: 83, chaise: 164, style: { material: "fabric", legs: "block", legHeight: 3, arms: "wide", back: "loose-cushions", seatCushions: 4 },
+    meas: { seatHeight: 48, seatDepth: 55, armWidth: 22, armHeight: 54, backHeight: 68, legHeight: 6 } },
+  { re: /vimle.*3-seat-sofa-with-chaise-longue/, type: "sofa", w: 252, d: 98, h: 83, chaise: 164, style: { material: "fabric", legs: "block", legHeight: 3, arms: "wide", back: "loose-cushions", seatCushions: 3 },
+    meas: { seatHeight: 48, seatDepth: 55, armWidth: 22, armHeight: 54, backHeight: 68, legHeight: 6 } },
+  { re: /kivik.*3-seat-sofa(?!-with)/, type: "sofa", w: 228, d: 95, h: 83, style: { material: "fabric", legs: "block", legHeight: 4, arms: "wide", back: "loose-cushions", seatCushions: 3 },
+    meas: { seatHeight: 45, seatDepth: 60 } },
+  { re: /malm.*bed-frame-high/, type: "bed", w: 176, d: 209, h: 100, note: "Size for the 160×200 cm mattress version.", style: { material: "wood", headboard: "panel", legs: "plinth" },
+    meas: { headboardHeight: 100, footboardHeight: 38 } },
   { re: /strandmon.*wing-chair/, type: "armchair", w: 82, d: 96, h: 101, style: { material: "fabric", legs: "tapered", legHeight: 16, arms: "rolled", back: "wing" } },
   { re: /poang.*armchair/, type: "armchair", w: 68, d: 82, h: 100, style: { material: "fabric", legs: "cantilever" } },
   { re: /ekedalen.*extendable-table/, type: "table", w: 120, d: 80, h: 75, note: "Extends to 180 cm.", style: { material: "wood", legs: "tapered", top: "rect", topThick: 3 } },
@@ -781,6 +801,10 @@ const TYPE_STYLE = {
   pendant: { material: "metal", shade: "dome" }, plant: { material: "ceramic", foliage: "leafy" },
   deco: { material: "ceramic", profile: "auto" }, box: { material: "painted" },
 };
+function measOf(it) {
+  return { ...(CATALOG.find((c) => c.re.test(it.slug ?? ""))?.meas ?? {}), ...(it.meas ?? {}) };
+}
+const cm = (v) => (Number.isFinite(v) && v > 0 ? v / 100 : undefined);
 function styleOf(it) {
   const preset = CATALOG.find((c) => c.re.test(it.slug ?? ""))?.style;
   return { ...(TYPE_STYLE[it.type] ?? {}), ...(preset ?? {}), ...(it.style ?? {}) };
@@ -880,12 +904,17 @@ function buildSofa(g, it, mats, st) {
   const w = it.w / 100, d = it.d / 100, h = it.h / 100;
   const armchair = it.type === "armchair";
   if (st.legs === "cantilever") return buildCantilever(g, it, mats, st);
-  const legH = st.legs === "none" || st.legs === "plinth" ? 0 : Math.max(0, (st.legHeight ?? 6) / 100);
-  const a = { none: 0, slim: Math.min(0.12, w * 0.09), wide: 0.22, rolled: Math.min(0.16, w * 0.13), sloped: Math.min(0.16, w * 0.12) }[st.arms]
+  const m = measOf(it); // published measurements win over style guesses
+  const legH = st.legs === "none" || st.legs === "plinth" ? 0 : Math.max(0, cm(m.legHeight) ?? (st.legHeight ?? 6) / 100);
+  const a = st.arms === "none" ? 0 : cm(m.armWidth) ?? { slim: Math.min(0.12, w * 0.09), wide: 0.22, rolled: Math.min(0.16, w * 0.13), sloped: Math.min(0.16, w * 0.12) }[st.arms]
     ?? (/wide-armrests/.test(it.slug ?? "") ? 0.22 : 0.15);
-  const baseTop = Math.max(legH + 0.12, Math.min(0.30, h * 0.36)), seatTop = Math.max(baseTop + 0.08, Math.min(0.48, h * 0.6));
-  const armTop = st.arms === "sloped" ? Math.min(0.56, h * 0.66) : Math.min(0.64, h * 0.74);
-  const backD = st.back === "loose-cushions" ? Math.min(0.14, d * 0.15) : Math.min(0.24, d * 0.25);
+  const seatTop = Math.min(h - 0.1, cm(m.seatHeight) ?? Math.max(legH + 0.2, Math.min(0.48, h * 0.6)));
+  const baseTop = Math.max(legH + 0.08, seatTop - (st.material === "leather" ? 0.1 : 0.14));
+  const armTop = Math.min(h, cm(m.armHeight) ?? (st.arms === "sloped" ? Math.min(0.56, h * 0.66) : Math.min(0.64, h * 0.74)));
+  const seatD = cm(m.seatDepth);
+  const backD = st.back === "loose-cushions"
+    ? Math.max(0.08, seatD ? d - seatD - 0.17 : Math.min(0.14, d * 0.15))
+    : Math.max(0.1, seatD ? d - seatD : Math.min(0.24, d * 0.25));
   const D = Math.max(d, it.chaise / 100 || 0);
   const z0 = -D / 2, zf = z0 + d;
   const { main, cush } = mats, lm = legMat(st, mats);
@@ -904,7 +933,7 @@ function buildSofa(g, it, mats, st) {
   // back
   const backTop = st.back === "low" ? h * 0.82 : h;
   if (st.back === "loose-cushions") {
-    blk(g, main, -w / 2 + a * 0.5, w / 2 - a * 0.5, baseTop, backTop * 0.86, z0, z0 + backD, 0.02);
+    blk(g, main, -w / 2 + a * 0.5, w / 2 - a * 0.5, baseTop, Math.min(backTop, cm(m.backHeight) ?? backTop * 0.86), z0, z0 + backD, 0.02);
     for (let k = 0; k < n; k++) {
       const x0 = -w / 2 + a + inner * k / n, x1 = -w / 2 + a + inner * (k + 1) / n;
       const c = blk(g, cush, x0 + 0.01, x1 - 0.01, seatTop - 0.02, backTop, z0 + backD - 0.02, z0 + backD + 0.17, 0.06);
@@ -956,8 +985,9 @@ function buildCantilever(g, it, mats, st) {
 }
 function buildBed(g, it, mats, st) {
   const w = it.w / 100, d = it.d / 100, h = it.h / 100;
-  const legH = st.legs === "plinth" || st.legs === "none" ? 0 : Math.max(0, (st.legHeight ?? 20) / 100);
-  const frameTop = Math.max(legH + 0.1, Math.min(0.38, h * 0.4));
+  const m = measOf(it);
+  const legH = st.legs === "plinth" || st.legs === "none" ? 0 : Math.max(0, cm(m.legHeight) ?? (st.legHeight ?? 20) / 100);
+  const frameTop = Math.max(legH + 0.1, cm(m.footboardHeight) ?? Math.min(0.38, h * 0.4));
   const linen = new THREE.MeshStandardMaterial({ color: 0xf4f3ef, roughness: 1, map: texture("fabric"), clippingPlanes: [cutPlane] });
   if (legH > 0) legSet(g, legMat(st, mats), st, w, d, legH, 0.05, 0.05);
   blk(g, mats.main, -w / 2, w / 2, legH, frameTop, -d / 2 + 0.06, d / 2);
@@ -970,7 +1000,7 @@ function buildBed(g, it, mats, st) {
   return [[-w / 2, -d / 2, w / 2, d / 2]];
 }
 function buildTable(g, it, mats, st) {
-  const w = it.w / 100, d = it.d / 100, h = it.h / 100, t = Math.max(0.015, (st.topThick ?? 3) / 100);
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, t = Math.max(0.015, cm(measOf(it).topThick) ?? (st.topThick ?? 3) / 100);
   const { main } = mats, lm = legMat(st, mats);
   const lsize = st.legs === "block" || (st.legs === "square" && t >= 0.045) ? 0.05 : 0.045;
   if (st.top === "round" || st.top === "oval") {
@@ -988,7 +1018,7 @@ function buildTable(g, it, mats, st) {
   return [[-w / 2, -d / 2, w / 2, d / 2]];
 }
 function buildChair(g, it, mats, st) {
-  const w = it.w / 100, d = it.d / 100, h = it.h / 100, seat = Math.min(0.46, h * 0.56);
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, seat = Math.min(h - 0.02, cm(measOf(it).seatHeight) ?? Math.min(0.46, h * 0.56));
   const lm = legMat(st, mats);
   legSet(g, lm, st.legs === "plinth" ? { ...st, legs: "square" } : st, w, d, seat - 0.04, 0.035, 0.01);
   blk(g, st.material === "fabric" || st.material === "velvet" ? mats.cush : mats.main, -w / 2, w / 2, seat - 0.04, seat, -d / 2, d / 2, 0.01);
@@ -1013,7 +1043,7 @@ function buildStorage(g, it, mats, st) {
     if (kallax) { const c = Math.max(1, Math.round(w / 0.39)); for (let k = 1; k < c; k++) { const x = -w / 2 + w * k / c; blk(g, main, x - t / 2, x + t / 2, 0.06, h - t, -d / 2, d / 2); } }
     return [[-w / 2, -d / 2, w / 2, d / 2]];
   }
-  const legH = st.legs === "plinth" || st.legs === "none" ? 0 : Math.max(0, (st.legHeight ?? 15) / 100);
+  const legH = st.legs === "plinth" || st.legs === "none" ? 0 : Math.max(0, cm(measOf(it).legHeight) ?? (st.legHeight ?? 15) / 100);
   const bot = legH > 0 ? legH : 0.08;
   if (legH > 0) legSet(g, legMat(st, mats), st, w, d, legH, 0.04, 0.05);
   else blk(g, mats.dark, -w / 2 + 0.03, w / 2 - 0.03, 0, 0.08, -d / 2 + 0.03, d / 2 - 0.05);
@@ -1055,16 +1085,16 @@ function shadeGeo(kind, w, h) {
 }
 function lampShadeMat(it, st) { return makeMat(it.colour, st.material === "glass" || st.material === "metal" || st.material === "rattan" ? st.material : "paper"); }
 function buildLamp(g, it, mats, st) {
-  const w = it.w / 100, h = it.h / 100, sh = Math.min(0.35, h * 0.25);
+  const ms = measOf(it), w = it.w / 100, h = it.h / 100, sh = cm(ms.shadeHeight) ?? Math.min(0.35, h * 0.25), sw = cm(ms.shadeDiameter) ?? w;
   const stem = makeMat((it.colour2 ?? mats.dark.color.getStyle()), "metal");
   cyl(g, stem, 0, 0, 0, 0.03, w * 0.35, w * 0.35, 24);
   cyl(g, stem, 0, 0, 0.03, h - sh * 0.6, 0.012, 0.012, 8);
-  const m = mesh(g, shadeGeo(st.shade, w, sh), lampShadeMat(it, st), st.shade === "globe" || st.shade === "dome" || st.shade === "bell" ? h - sh : h - sh / 2);
+  const m = mesh(g, shadeGeo(st.shade, sw, sh), lampShadeMat(it, st), st.shade === "globe" || st.shade === "dome" || st.shade === "bell" ? h - sh : h - sh / 2);
   m.castShadow = false;
   return [[-w / 2, -w / 2, w / 2, w / 2]];
 }
 function buildTableLamp(g, it, mats, st) {
-  const w = it.w / 100, h = it.h / 100, sh = h * 0.42;
+  const ms = measOf(it), w0 = it.w / 100, h = it.h / 100, sh = cm(ms.shadeHeight) ?? h * 0.42, w = cm(ms.shadeDiameter) ?? w0;
   const baseMat = makeMat(it.colour2 ?? it.colour, st.material === "paper" ? "ceramic" : st.material);
   if (st.material === "metal") { cyl(g, baseMat, 0, 0, 0, 0.025, w * 0.3, w * 0.32, 24); cyl(g, baseMat, 0, 0, 0.025, h - sh * 0.7, 0.008, 0.008, 8); }
   else mesh(g, new THREE.LatheGeometry([[0.001, 0], [w * 0.22, 0], [w * 0.3, h * 0.2], [w * 0.26, h * 0.42], [w * 0.08, h * 0.56], [0.001, h * 0.58]].map(([a, b]) => new THREE.Vector2(a, b)), 28), baseMat, 0);
@@ -1075,9 +1105,9 @@ function buildTableLamp(g, it, mats, st) {
 }
 function buildPendant(g, it, mats, st) {
   // local y = 0 is the bottom of the shade; the cord runs up to the ceiling
-  const w = it.w / 100, h = it.h / 100;
+  const ms = measOf(it), w = cm(ms.shadeDiameter) ?? it.w / 100, h = it.h / 100;
   const cord = Math.max(0, CEIL - elevM(it) - h);
-  const sh = mesh(g, shadeGeo(st.shade, w, h), lampShadeMat(it, st), st.shade === "drum" || st.shade === "cone" ? h / 2 : st.shade === "globe" ? h / 2 : 0);
+  const sh = mesh(g, shadeGeo(st.shade, w, cm(ms.shadeHeight) ?? h), lampShadeMat(it, st), st.shade === "drum" || st.shade === "cone" ? h / 2 : st.shade === "globe" ? h / 2 : 0);
   if (st.shade === "globe") sh.scale.y = h / w;
   mesh(g, new THREE.SphereGeometry(Math.min(0.04, w * 0.12), 12, 8), new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffd98a, emissiveIntensity: 1.2 }), h * 0.3).castShadow = false;
   const cordMat = makeMat(it.colour2 ?? "#2b2b2d", "plastic");
@@ -1086,7 +1116,7 @@ function buildPendant(g, it, mats, st) {
   return [[-w / 2, -w / 2, w / 2, w / 2]];
 }
 function buildPlant(g, it, mats, st) {
-  const w = it.w / 100, h = it.h / 100, potH = Math.min(h * 0.35, w * 0.9);
+  const w = it.w / 100, h = it.h / 100, potH = Math.min(h * 0.9, cm(measOf(it).potHeight) ?? Math.min(h * 0.35, w * 0.9));
   mesh(g, new THREE.CylinderGeometry(w * 0.42, w * 0.32, potH, 24), makeMat(it.colour, st.material), potH / 2);
   const leaf = new THREE.MeshStandardMaterial({ color: 0x4f7a45, roughness: 0.85, flatShading: true, side: THREE.DoubleSide, clippingPlanes: [cutPlane] });
   const crown = h - potH, r = Math.max(w * 0.5, 0.06);
@@ -1401,7 +1431,7 @@ function statusOf(it) {
 }
 function srcChip(it) {
   return { catalog: ["info", "IKEA size"], link: ["info", "Size from link"], claude: ["warn", "Claude estimate"],
-    claudeKnown: ["info", "Claude, from memory"], typical: ["warn", "Typical size"], manual: ["info", "Your size"] }[it.src] ?? ["info", ""];
+    claudeKnown: ["info", "Claude, from memory"], typical: ["warn", "Typical size"], manual: ["info", "Your size"], plan: ["info", "From IKEA measurements"] }[it.src] ?? ["info", ""];
 }
 function renderList() {
   const ul = $("placed"); ul.innerHTML = "";
@@ -1519,7 +1549,7 @@ function syncMountRow() {
   $("dElevLbl").textContent = m === "ceiling" ? "Cable cm" : "Height cm";
   $("dElev").title = m === "ceiling" ? "From the ceiling to the top of the lamp" : "From the floor to the bottom of the piece";
 }
-$("dType").onchange = () => { if (draftData) renderStyleGrid({ ...draftData, type: $("dType").value, style: {} }); syncChaiseRow(); $("dMount").value = defaultMount($("dType").value); syncMountRow(); setMountInput(); };
+$("dType").onchange = () => { if (draftData) { renderStyleGrid({ ...draftData, type: $("dType").value, style: {} }); renderMeasGrid({ ...draftData, type: $("dType").value }); } syncChaiseRow(); $("dMount").value = defaultMount($("dType").value); syncMountRow(); setMountInput(); };
 $("dMount").onchange = () => { syncMountRow(); setMountInput(); };
 function setMountInput() {
   const m = $("dMount").value;
@@ -1601,56 +1631,215 @@ function dominantColours(canvas) {
   const second = top.find((c) => Math.hypot(c[0] - first[0], c[1] - first[1], c[2] - first[2]) > 70);
   return [hex(first), second ? hex(second) : null];
 }
-let photoSeq = 0;
+// ---- measurements from the IKEA page ("plans"): the Measurements list, or the dimension drawings
+const MEAS_FIELDS = {
+  sofa: ["seatHeight", "seatDepth", "armWidth", "armHeight", "backHeight", "legHeight"],
+  armchair: ["seatHeight", "seatDepth", "armWidth", "armHeight", "backHeight", "legHeight"],
+  bed: ["headboardHeight", "footboardHeight", "legHeight"],
+  table: ["topThick"], desk: ["topThick"], chair: ["seatHeight", "seatDepth"],
+  storage: ["legHeight"], lamp: ["shadeDiameter", "shadeHeight"], tablelamp: ["shadeDiameter", "shadeHeight"],
+  pendant: ["shadeDiameter", "shadeHeight"], plant: ["potHeight"],
+};
+const MEAS_LABELS = { seatHeight: "Seat height", seatDepth: "Seat depth", armWidth: "Armrest width", armHeight: "Armrest height",
+  backHeight: "Backrest height", legHeight: "Free height under", headboardHeight: "Headboard height", footboardHeight: "Footboard height",
+  topThick: "Top thickness", shadeDiameter: "Shade diameter", shadeHeight: "Shade height", potHeight: "Pot height" };
+const ALL_MEAS = Object.keys(MEAS_LABELS);
+// label patterns (English, German, French), most specific first
+const MEAS_RULES = [
+  [/mattress|matratze|matelas|cushion thickness|kissenst|duvet|bettdecke/i, "skip"],
+  [/seat width|sitzbreite|largeur d.assise/i, "skip"],
+  [/seat depth,? chaise|sitztiefe,? r[ée]camiere|profondeur d.assise,? m[ée]ridienne/i, "skip"],
+  [/depth,? chaise|chaise longue depth|tiefe,? r[ée]camiere|profondeur,? m[ée]ridienne/i, "chaise"],
+  [/seat depth|sitztiefe|profondeur d.assise/i, "seatDepth"],
+  [/seat height|sitzh[öo]he|hauteur d.assise/i, "seatHeight"],
+  [/arm ?rest width|armlehnenbreite|largeur (de l.)?accoudoir/i, "armWidth"],
+  [/arm ?rest height|armlehnenh[öo]he|hauteur (de l.)?accoudoir/i, "armHeight"],
+  [/height,? backrest|backrest height|r[üu]ckenlehnenh[öo]he|hauteur (du )?dossier/i, "backHeight"],
+  [/free height|freie h[öo]he|hauteur libre/i, "legHeight"],
+  [/headboard|kopfteil|t[êe]te de lit/i, "headboardHeight"],
+  [/footboard|fu(ss|ß)teil|pied de lit/i, "footboardHeight"],
+  [/shade diameter|schirmdurchmesser|diam[èe]tre (de l.)?abat/i, "shadeDiameter"],
+  [/shade height|schirmh[öo]he|hauteur (de l.)?abat/i, "shadeHeight"],
+  [/pot height|topfh[öo]he|hauteur (du )?pot/i, "potHeight"],
+  [/thickness|dicke|st[äa]rke|[ée]paisseur/i, "topThick"],
+  [/min\.? ?length|min\.? ?l[äa]nge|longueur min/i, "minLength"],
+  [/max\.? ?length|max\.? ?l[äa]nge|longueur max|cord|kabel|cordon/i, "skip"],
+  [/diameter|durchmesser|diam[èe]tre/i, "diameter"],
+  [/length|l[äa]nge|longueur/i, "length"],
+  [/width|breite|largeur/i, "width"],
+  [/depth|tiefe|profondeur/i, "depth"],
+  [/height|h[öo]he|hauteur/i, "height"],
+];
+const NUM = /(\d+(?:[.,]\d+)?)\s*(cm|mm|m)\b/i;
+function parseMeasurements(text, type) {
+  const raw = {};
+  let pendingKey = null;
+  for (let line of String(text).split(/\r?\n|;\s*/)) {
+    line = line.trim(); if (!line) continue;
+    const num = line.match(NUM);
+    const label = line.replace(NUM, "").replace(/[:\d.,]/g, " ").replace(/\s+/g, " ").trim();
+    let key = null;
+    if (/[a-zäöüéèêà]{3}/i.test(label)) { key = (MEAS_RULES.find(([re]) => re.test(label)) ?? [null, "skip"])[1]; }
+    else key = pendingKey;
+    if (!num) { pendingKey = key; continue; }
+    pendingKey = null;
+    if (!key || key === "skip" || key in raw) continue;
+    let v = parseFloat(num[1].replace(",", "."));
+    const unit = num[2].toLowerCase();
+    if (unit === "mm") v /= 10; else if (unit === "m") v *= 100;
+    if (v > 0 && v < 1000) raw[key] = Math.round(v * 10) / 10;
+  }
+  const out = { meas: {} };
+  const lw = type === "table" || type === "desk" || type === "rug";
+  if (type === "bed") { out.w = raw.width; out.d = raw.length ?? raw.depth; }
+  else if (lw && (raw.length || raw.minLength)) { out.w = raw.minLength ?? raw.length; out.d = raw.width ?? raw.depth; }
+  else { out.w = raw.width ?? raw.length; out.d = raw.depth; }
+  if (raw.diameter) { out.w ??= raw.diameter; out.d ??= raw.diameter; }
+  out.h = raw.height ?? raw.headboardHeight;
+  if (raw.chaise) out.chaise = raw.chaise;
+  for (const k of ALL_MEAS) if (raw[k] !== undefined) out.meas[k] = raw[k];
+  out.count = Object.keys(raw).length;
+  return out;
+}
+function renderMeasGrid(d) {
+  const grid = $("dMeasGrid"); grid.innerHTML = "";
+  const m = { ...(CATALOG.find((c) => c.re.test(d.slug ?? ""))?.meas ?? {}), ...(d.meas ?? {}) };
+  for (const f of MEAS_FIELDS[d.type] ?? []) {
+    const lab = document.createElement("label"); lab.textContent = MEAS_LABELS[f] + " cm";
+    const el = document.createElement("input"); el.type = "number"; el.min = 0; el.max = 300; el.step = 0.5; el.id = "ms-" + f; el.dataset.m = f;
+    el.value = m[f] ?? ""; lab.appendChild(el); grid.appendChild(lab);
+  }
+  $("dMeasNone").hidden = (MEAS_FIELDS[d.type] ?? []).length > 0;
+}
+function readMeas() {
+  const m = {};
+  for (const el of $("dMeasGrid").querySelectorAll("[data-m]")) { const v = Number(el.value); if (el.value !== "" && v > 0) m[el.dataset.m] = v; }
+  return m;
+}
+function applyMeasurements(r, how) {
+  const set = (id, v) => { if (Number.isFinite(v) && v > 0) $(id).value = Math.round(v); };
+  set("dW", r.w); set("dD", r.d); set("dH", r.h);
+  if (r.chaise) { $("dType").value === "sofa" && set("dCD", r.chaise); draftData.chaise = Math.round(r.chaise); }
+  draftData.meas = { ...(draftData.meas ?? {}), ...r.meas };
+  renderMeasGrid({ ...draftData, type: $("dType").value });
+  if (r.w || r.d || r.h) { draftData.src = "plan"; setSrcChip("plan", draftData.note); }
+  $("dMeasBox").open = true;
+  const parts = [r.w && `width ${Math.round(r.w)}`, r.d && `depth ${Math.round(r.d)}`, r.h && `height ${Math.round(r.h)}`,
+    ...Object.entries(r.meas ?? {}).map(([k, v]) => `${MEAS_LABELS[k].toLowerCase()} ${v}`)].filter(Boolean);
+  return parts.length ? `${how}: ${parts.join(", ")} cm.` : "";
+}
+$("dMeasText").addEventListener("input", () => {
+  const t = $("dMeasText").value;
+  if (!t.trim()) { $("dMeasStatus").textContent = ""; return; }
+  const r = parseMeasurements(t, $("dType").value);
+  $("dMeasStatus").textContent = r.count ? applyMeasurements(r, `Read ${r.count} measurement${r.count === 1 ? "" : "s"}`)
+    : "No measurements found. Paste the lines that look like “Width: 336 cm”.";
+});
+
+// ---- photos and drawings: thumbnails + colours at once, then Claude reads style and dimensions
+let photoSeq = 0, draftImgs = [], askTimer = 0;
+function looksLikeDrawing(canvas) {
+  const x = canvas.getContext("2d"), px = x.getImageData(0, 0, canvas.width, canvas.height).data;
+  let ink = 0, sat = 0, n = 0;
+  for (let i = 0; i < px.length; i += 16) {
+    const r = px[i], g = px[i + 1], b = px[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b); n++;
+    if (mn > 222 && mx - mn < 16) continue;
+    ink++; sat += mx ? (mx - mn) / mx : 0;
+  }
+  return ink / n < 0.2 && (ink ? sat / ink : 0) < 0.15;
+}
+function renderImgs() {
+  const box = $("dImgs"); box.innerHTML = "";
+  for (const [i, im] of draftImgs.entries()) {
+    const f = document.createElement("figure");
+    f.innerHTML = `<img alt=""><figcaption></figcaption><button type="button" aria-label="Remove image" title="Remove">✕</button>`;
+    f.querySelector("img").src = im.thumb; f.querySelector("figcaption").textContent = im.drawing ? "Drawing" : "Photo";
+    f.querySelector("button").onclick = () => { draftImgs.splice(i, 1); renderImgs(); };
+    box.appendChild(f);
+  }
+  box.hidden = !draftImgs.length;
+  const photo = draftImgs.find((x) => !x.drawing);
+  if (photo) { draftData.photo = photo.thumb; $("dPhoto").src = photo.thumb; }
+  $("dPhoto").hidden = !draftData?.photo || draftImgs.length > 0;
+}
 async function handlePhoto(file) {
-  if (!file || !/^image\//.test(file.type)) { $("dStyleStatus").textContent = "That isn't an image. Copy the product photo itself, or pick a .jpg, .png or .webp file."; return; }
-  const seq = ++photoSeq;
+  if (!file || !/^image\//.test(file.type)) { $("dStyleStatus").textContent = "That isn't an image. Copy the photo or drawing itself, or pick a .jpg, .png or .webp file."; return; }
   let im;
   try { im = await loadImage(file); } catch { $("dStyleStatus").textContent = "Couldn't read that image. Try another copy or file."; return; }
-  const thumbC = scaled(im, 160), big = scaled(im, 768);
-  draftData.photo = thumbC.toDataURL("image/jpeg", 0.72);
-  $("dPhoto").src = draftData.photo; $("dPhoto").hidden = false;
-  const [c1, c2] = dominantColours(big);
-  if (c1) { $("dColour").value = c1; draftData.colour = c1; }
-  if (c2 && $("dColour2")) { $("dColour2").value = c2; draftData.colour2 = c2; }
+  const big = scaled(im, 1024);
+  const drawing = looksLikeDrawing(scaled(im, 200));
+  const blob = await new Promise((r) => big.toBlob(r, "image/jpeg", 0.88));
+  if (draftImgs.length >= 4) draftImgs.shift();
+  draftImgs.push({ blob, drawing, thumb: scaled(im, 160).toDataURL("image/jpeg", 0.72) });
+  renderImgs();
+  if (!drawing) {
+    const [c1, c2] = dominantColours(big);
+    if (c1) { $("dColour").value = c1; draftData.colour = c1; }
+    if (c2 && $("dColour2")) { $("dColour2").value = c2; draftData.colour2 = c2; }
+  }
   const sample = await getSample();
   const lim = sample ? await sample.limits().catch(() => null) : null;
   if (!sample || sampleBlocked || !lim?.images) {
-    $("dStyleStatus").textContent = "Colours taken from the photo. Set the rest under Style below."; $("dStyleBox").open = true; return;
+    $("dStyleStatus").textContent = drawing ? "Claude isn't available here to read drawings. Paste the Measurements list below instead."
+      : "Colours taken from the photo. Set the rest under Style below.";
+    (drawing ? $("dMeasBox") : $("dStyleBox")).open = true; return;
   }
-  $("dStyleStatus").textContent = "Colours taken from the photo. Asking Claude to read the style… This uses your Claude usage.";
-  const blob = await new Promise((r) => big.toBlob(r, "image/jpeg", 0.86));
+  $("dStyleStatus").textContent = "Add more photos or drawings now if you have them…";
+  clearTimeout(askTimer);
+  askTimer = setTimeout(() => askClaudeAboutImages(sample, Math.min(4, lim.images.maxCount ?? 4)), 900);
+}
+async function askClaudeAboutImages(sample, maxCount) {
+  const seq = ++photoSeq;
+  const imgs = draftImgs.slice(-maxCount);
+  const nPhotos = imgs.filter((x) => !x.drawing).length, nDraw = imgs.length - nPhotos;
   const type = $("dType").value;
-  const fields = STYLE_FIELDS[type] ?? ["material"];
-  const keys = fields.map((f) => NUMERIC[f] ? `"${f}": number` : `"${f}": one of ${JSON.stringify(STYLE_OPTIONS[f])}`).join(",\n ");
-  const prompt = `The image is the product photo of an IKEA item: ${draftData.family} ${draftData.desc} (built as a ${SHAPES[type]?.label ?? type}, about ${$("dW").value}×${$("dD").value}×${$("dH").value} cm).
-I build a simple 3D model of it from a few parameters. Look only at the product, not the background, props or people.
-Reply with only this JSON (leave out a key if you can't tell):
-{"colour": "#rrggbb, the main visible surface (upholstery, wood, body or shade)",
- "colour2": "#rrggbb, the second colour (legs, frame, base, cord), or the same as colour",
+  const keys = (STYLE_FIELDS[type] ?? ["material"]).map((f) => NUMERIC[f] ? `"${f}": number` : `"${f}": one of ${JSON.stringify(STYLE_OPTIONS[f])}`).join(",\n ");
+  const mkeys = (MEAS_FIELDS[type] ?? []).map((f) => `"${f}": cm`).join(", ");
+  $("dStyleStatus").textContent = `Asking Claude to read ${imgs.length === 1 ? "the image" : `the ${imgs.length} images`}… This uses your Claude usage.`;
+  const prompt = `The ${imgs.length === 1 ? "image is" : "images are"} from the IKEA product page of ${draftData.family} ${draftData.desc}, built here as a ${SHAPES[type]?.label ?? type}.
+Some may be product photos and some may be measurement drawings (line drawings with dimension lines and numbers, usually in cm; convert inches if that's all there is).
+I build a simple to-scale 3D model of it from a few parameters. Use the drawings for sizes and proportions, and the photos for colours, materials and style.
+Look only at the product, not the background, props or people. Current size: ${$("dW").value}×${$("dD").value}×${$("dH").value} cm (width × depth × height).
+Reply with only this JSON. Leave out any size you can't read from a drawing, and any style key you can't see:
+{"width_cm": number, "depth_cm": number, "height_cm": number, "chaise_depth_cm": number,
+ "meas": {${mkeys}},
+ "colour": "#rrggbb, the main visible surface (upholstery, wood, body or shade)",
+ "colour2": "#rrggbb, the second colour (legs, frame, base, cord)",
  ${keys},
- "note": "at most 12 words on what you saw"}
-legHeight = visible leg height under the body in cm; seatCushions = number of separate seat cushions; topThick = tabletop thickness in cm.`;
+ "note": "at most 14 words on what you read"}
+width = side to side seen from the front; depth = front to back (beds: length); legHeight = free height under the body; seatCushions = separate seat cushions.`;
   try {
-    const r = await sample.json(prompt, { images: blob, modelTier: "default", cache: { gcTime: 86400000 } });
+    const r = await sample.json(prompt, { images: imgs.map((x) => x.blob), modelTier: "default", cache: { gcTime: 86400000 } });
     if (seq !== photoSeq || $("draft").hidden) return;
-    if (HEX.test(r?.colour ?? "")) { $("dColour").value = r.colour; draftData.colour = r.colour; }
-    if (HEX.test(r?.colour2 ?? "")) draftData.colour2 = r.colour2;
-    draftData.style = { ...(draftData.style ?? {}), ...cleanStyle(r, type) };
-    renderStyleGrid({ ...draftData, type });
-    $("dStyleBox").open = true;
-    $("dStyleStatus").textContent = "Style read from the photo" + (r?.note ? `: ${String(r.note).slice(0, 100).replace(/[.\s]+$/, "")}.` : ".") + " Adjust anything under Style.";
+    const msgs = [];
+    if (nPhotos) {
+      if (HEX.test(r?.colour ?? "")) { $("dColour").value = r.colour; draftData.colour = r.colour; }
+      if (HEX.test(r?.colour2 ?? "")) draftData.colour2 = r.colour2;
+      draftData.style = { ...(draftData.style ?? {}), ...cleanStyle(r, type) };
+      renderStyleGrid({ ...draftData, type });
+      $("dStyleBox").open = true;
+      msgs.push("Style read from the photo.");
+    }
+    const num = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) < 1000 ? Number(v) : undefined);
+    const meas = {};
+    for (const k of MEAS_FIELDS[type] ?? []) { const v = num(r?.meas?.[k]); if (v) meas[k] = v; }
+    if (nDraw) {
+      const m = applyMeasurements({ w: num(r?.width_cm), d: num(r?.depth_cm), h: num(r?.height_cm), chaise: num(r?.chaise_depth_cm), meas }, "From the drawing");
+      msgs.push(m || "Claude couldn't read sizes from the drawing; paste the Measurements list below instead.");
+    } else if (Object.keys(meas).length) applyMeasurements({ meas }, "");
+    if (r?.note) msgs.push(`(${String(r.note).slice(0, 110).replace(/[.\s]+$/, "")}.)`);
+    $("dStyleStatus").textContent = msgs.join(" ") + " Check and adjust below.";
   } catch (e) {
     if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e?.code)) sampleBlocked = true;
     if (e?.code === "cancelled") return;
-    $("dStyleStatus").textContent = e?.code === "rate_limited" ? "Claude is busy; colours come from the photo. Set the rest under Style, or try the photo again later."
-      : e?.code === "image_rejected" ? "Claude couldn't use that image. Try a different copy of the photo."
-      : "Colours come from the photo. Claude couldn't read the style, so set it under Style below.";
+    $("dStyleStatus").textContent = e?.code === "rate_limited" ? "Claude is busy right now. Set the style below, or paste the images again later."
+      : e?.code === "image_rejected" ? "Claude couldn't use one of the images. Remove it and try again."
+      : "Claude couldn't read the images. Set the style and paste the Measurements list below.";
     $("dStyleBox").open = true;
   }
 }
 $("dPhotoBtn").onclick = () => $("dPhotoFile").click();
-$("dPhotoFile").onchange = (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handlePhoto(f); };
+$("dPhotoFile").onchange = (e) => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; fs.slice(0, 4).forEach(handlePhoto); };
 document.addEventListener("paste", (e) => {
   if ($("draft").hidden) return;
   const f = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
@@ -1659,7 +1848,7 @@ document.addEventListener("paste", (e) => {
 const pbox = $("dPhotoBox");
 pbox.addEventListener("dragover", (e) => { e.preventDefault(); pbox.classList.add("over"); });
 pbox.addEventListener("dragleave", () => pbox.classList.remove("over"));
-pbox.addEventListener("drop", (e) => { e.preventDefault(); pbox.classList.remove("over"); const f = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith("image/")); if (f) handlePhoto(f); });
+pbox.addEventListener("drop", (e) => { e.preventDefault(); pbox.classList.remove("over"); [...(e.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith("image/")).slice(0, 4).forEach(handlePhoto); });
 
 function openDraft(d, mode) {
   draftData = { ...d }; editingId = mode === "edit" ? d.id : null;
@@ -1673,7 +1862,8 @@ function openDraft(d, mode) {
   $("dPlace").textContent = mode === "edit" ? "Save changes" : "Place in model";
   setSrcChip(d.src, d.note);
   syncChaiseRow();
-  photoSeq++; // drop answers meant for a previous card
+  photoSeq++; clearTimeout(askTimer); draftImgs = []; renderImgs(); // drop images and answers meant for a previous card
+  $("dMeasText").value = ""; $("dMeasStatus").textContent = ""; renderMeasGrid(d); $("dMeasBox").open = false;
   $("dPhoto").hidden = !d.photo; if (d.photo) $("dPhoto").src = d.photo;
   $("dStyleStatus").textContent = d.photo ? "Style taken from this photo. Add another photo to redo it." : "";
   renderStyleGrid(d);
@@ -1688,10 +1878,10 @@ function readDraft() {
   const n = (id, lo, hi) => Math.min(hi, Math.max(lo, Math.round(Number($(id).value) || 0)));
   const d = { ...draftData, type: $("dType").value, w: n("dW", 5, 600), d: n("dD", 5, 600), h: n("dH", 1, 300),
     chaise: $("dType").value === "sofa" ? n("dCD", 0, 300) : 0, chaiseSide: $("dCS").value, colour: $("dColour").value,
-    mount: $("dMount").value, style: readStyle(), colour2: $("dColour2")?.value ?? draftData.colour2 };
+    mount: $("dMount").value, style: readStyle(), colour2: $("dColour2")?.value ?? draftData.colour2, meas: readMeas() };
   if (d.mount === "custom") d.elev = n("dElev", 0, 250);
   if (d.mount === "ceiling") d.drop = n("dElev", 0, 250);
-  if (d.w !== draftData.w || d.d !== draftData.d || d.h !== draftData.h || d.chaise !== (draftData.chaise || 0)) d.src = "manual";
+  if (draftData.src !== "plan" && (d.w !== draftData.w || d.d !== draftData.d || d.h !== draftData.h || d.chaise !== (draftData.chaise || 0))) d.src = "manual";
   return d;
 }
 let addSeq = 0;
@@ -1881,7 +2071,7 @@ document.addEventListener("keydown", (e) => {
 // ---- sync: one shared layout in the artifact's database, people live in the room.
 // Without a Claude viewer (a local file) everything stays in this browser.
 const ARTIFACT_URL = "https://claude.ai/artifact/AU4Q1joHJ5591a2iKdLMtk";
-const DOC_FIELDS = ["id", "url", "slug", "article", "family", "desc", "type", "w", "d", "h", "chaise", "chaiseSide", "mount", "elev", "drop", "style", "photo",
+const DOC_FIELDS = ["id", "url", "slug", "article", "family", "desc", "type", "w", "d", "h", "chaise", "chaiseSide", "mount", "elev", "drop", "style", "photo", "meas",
   "colour", "colour2", "x", "z", "rot", "src", "note", "example", "addedBy", "createdAt", "by", "updatedAt"];
 const GEOM_FIELDS = ["type", "w", "d", "h", "chaise", "chaiseSide", "colour", "colour2", "slug", "mount", "drop"];
 const sameStyle = (a, b) => JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
@@ -1959,7 +2149,7 @@ function applyFurniture(snap) {
     const next = { ...ch.doc.data(), id };
     const cur = items.find((i) => i.id === id);
     if (!cur) { items.push(next); refreshItem(next); continue; }
-    const geom = GEOM_FIELDS.some((k) => cur[k] !== next[k]) || !sameStyle(cur.style, next.style) || (cur.type === "pendant" && cur.elev !== next.elev);
+    const geom = GEOM_FIELDS.some((k) => cur[k] !== next[k]) || !sameStyle(cur.style, next.style) || !sameStyle(cur.meas, next.meas) || (cur.type === "pendant" && cur.elev !== next.elev);
     Object.assign(cur, next);
     if (geom) refreshItem(cur); else placeGroup(cur);
   }
