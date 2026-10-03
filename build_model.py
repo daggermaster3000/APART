@@ -307,6 +307,22 @@ info = {
                 "label": list(m(170, 342))}],
 }
 info["apartment_model_area_m2"] = round(sum(r["model_area_m2"] for r in rooms), 2)
+
+
+def rings(poly):
+    return [[[round(x, 3), round(z, 3)] for x, z in r.coords]
+            for p in getattr(poly, "geoms", [poly]) for r in [p.exterior, *p.interiors]]
+
+
+# Obstacles for the furniture planner: wall pieces at floor level (door and
+# glazing openings left clear) plus fixtures standing on the floor.
+living = next(r["poly"] for r in rooms if r["name"].startswith("Wohnen"))
+info["grid_origin"] = [round(living.bounds[2], 3), round(living.bounds[1], 3)]  # east wall + north glazing faces
+FLOOR_FIXTURES = ("Kitchen counter", "Bathtub", "WC", "Washer/dryer", "Corridor cabinet")
+info["obstacles"] = {
+    "walls": [rings(p.simplify(0.005)) for p in getattr(solid, "geoms", [solid])],
+    "fixtures": [rings(mbox(*r)) for n, r, *_ in FIXTURES if n in FLOOR_FIXTURES],
+}
 (OUT / "apartment.json").write_text(json.dumps(info, indent=2))
 
 tpl = (ROOT / "viewer_template.html").read_text()

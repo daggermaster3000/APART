@@ -6,16 +6,20 @@
 :root {
   --bg: #eef1f3; --panel: #ffffff; --fg: #1d2328; --muted: #5e6a73; --line: #d5dce1;
   --accent: #b0157f; --plan: #b2c1cc; --viewport: #e3e8ec;
+  --ok: #2f7d4f; --warn: #a1620a; --bad: #b3261e;
   --f-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #151a1e; --panel: #1c2227; --fg: #e6ebee; --muted: #93a0a9; --line: #2f383f;
-  --accent: #e45bb6; --plan: #5b6f7d; --viewport: #20272c; color-scheme: dark } }
+  --accent: #e45bb6; --plan: #5b6f7d; --viewport: #20272c;
+  --ok: #6cc28f; --warn: #e0a54a; --bad: #f08a80; color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #151a1e; --panel: #1c2227; --fg: #e6ebee; --muted: #93a0a9; --line: #2f383f;
-  --accent: #e45bb6; --plan: #5b6f7d; --viewport: #20272c; color-scheme: dark }
+  --accent: #e45bb6; --plan: #5b6f7d; --viewport: #20272c;
+  --ok: #6cc28f; --warn: #e0a54a; --bad: #f08a80; color-scheme: dark }
 html, body { height: 100%; }
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--fg); font-family: var(--f-display); font-size: 14px; }
 .app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 320px; }
 #view { position: relative; min-width: 0; min-height: 0; background: var(--viewport); overflow: hidden; }
@@ -60,6 +64,48 @@ input[type=checkbox] { accent-color: var(--accent); }
 .scalebar i { display: block; height: 5px; border: 1px solid var(--fg); border-top: 0; margin-top: 2px; }
 .compass { width: 44px; height: 44px; }
 .hint { position: absolute; top: 12px; left: 12px; right: 12px; font-size: 12px; color: var(--muted); pointer-events: none; }
+.tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--line); }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 6px 0;
+  font: inherit; font-weight: 500; color: var(--muted); cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.panel { display: flex; flex-direction: column; gap: 18px; }
+form.add { display: flex; gap: 6px; }
+input[type=url], input[type=number], select { font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); padding: 7px 8px; min-width: 0; }
+input[type=url] { flex: 1; }
+.btn { font: inherit; font-weight: 500; border: 1px solid var(--fg); background: var(--fg); color: var(--panel);
+  padding: 7px 12px; cursor: pointer; }
+.btn.ghost { background: none; color: var(--fg); border-color: var(--line); }
+.btn:disabled { opacity: .5; cursor: default; }
+.linkish { background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--accent); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px; justify-self: start; }
+.stack { display: grid; gap: 8px; }
+.draft { border: 1px solid var(--line); padding: 12px; display: grid; gap: 10px; }
+.draft .fam { font-weight: 700; letter-spacing: .02em; }
+.draft .desc { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.art { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); }
+.chip { display: inline-block; font-size: 11px; padding: 1px 6px; border: 1px solid currentColor; line-height: 1.5; white-space: nowrap; }
+.chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); } .chip.info { color: var(--muted); }
+.dims { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.dims label, .field { display: grid; gap: 3px; font-size: 11px; color: var(--muted); }
+.dims input { width: 100%; font-family: var(--f-mono); font-size: 12.5px; }
+.row2 { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.status { font-size: 12px; color: var(--muted); margin: 0; min-height: 1.2em; }
+ul.placed { list-style: none; margin: 0; padding: 0; display: grid; }
+ul.placed li.empty { display: block; color: var(--muted); font-size: 12.5px; border: 0; }
+ul.placed li:not(.empty) { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+ul.placed li[aria-selected="true"] .nm { color: var(--accent); }
+ul.placed .sw { width: 14px; height: 14px; border: 1px solid var(--line); }
+ul.placed .nm { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ul.placed .meta { grid-column: 2 / 4; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+ul.placed .meta .n { font-family: var(--f-mono); font-size: 11.5px; }
+.icons { display: flex; gap: 2px; }
+.icons button { background: none; border: 1px solid transparent; color: var(--fg); font: inherit; font-size: 13px; width: 28px; height: 26px; cursor: pointer; }
+.icons button:hover { border-color: var(--line); }
+.empty { color: var(--muted); font-size: 12.5px; margin: 0; }
+kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); padding: 0 4px; }
+.lbl.fdim { background: var(--fg); color: var(--panel); font-family: var(--f-mono); font-weight: 400; }
 @media (max-width: 760px) {
   .app { grid-template-columns: 1fr; grid-template-rows: minmax(0, 58%) minmax(0, 42%); }
   aside { border-left: 0; border-top: 1px solid var(--line); padding: 16px; }
@@ -102,19 +148,100 @@ input[type=checkbox] { accent-color: var(--accent); }
       </div>
       <p class="note" id="mnote" hidden>Click two points on a floor or wall to measure the distance. Click again to start over.</p>
     </section>
-    <section>
-      <h2>Rooms · click to focus</h2>
-      <table>
-        <thead><tr><th>Room</th><th>Plan BF</th><th>Model</th></tr></thead>
-        <tbody id="rooms"></tbody>
-        <tfoot><tr><td>Apartment</td><td class="n">94.0</td><td class="n" id="total"></td></tr></tfoot>
-      </table>
+    <div class="tabs" role="tablist" aria-label="Panels">
+      <button role="tab" id="t-furnish" aria-controls="p-furnish" aria-selected="true">Furnish</button>
+      <button role="tab" id="t-rooms" aria-controls="p-rooms" aria-selected="false">Rooms</button>
+      <button role="tab" id="t-about" aria-controls="p-about" aria-selected="false">About</button>
+    </div>
+
+    <section class="panel" id="p-furnish" role="tabpanel" aria-labelledby="t-furnish">
+      <div class="stack">
+        <h2>Add IKEA furniture</h2>
+        <form class="add" id="addForm" novalidate>
+          <input type="url" id="ikeaUrl" placeholder="Paste an ikea.com product link" aria-label="IKEA product link" autocomplete="off">
+          <button class="btn" type="submit">Add</button>
+        </form>
+        <button class="linkish" type="button" id="tryExample">Try it with the VIMLE sofa link</button>
+        <p class="status" id="addStatus" role="status"></p>
+      </div>
+
+      <div class="draft" id="draft" hidden>
+        <div>
+          <div class="fam" id="dFam"></div>
+          <div class="desc" id="dDesc"></div>
+          <div class="row2"><span class="art" id="dArt"></span><span class="chip" id="dSrc"></span></div>
+        </div>
+        <div class="row2">
+          <label class="field" style="flex:1">Shape
+            <select id="dType"></select></label>
+          <label class="field">Colour
+            <input type="color" id="dColour" style="width:44px;height:33px;padding:2px"></label>
+        </div>
+        <div class="dims">
+          <label>Width cm <input type="number" id="dW" min="5" max="600" step="1"></label>
+          <label>Depth cm <input type="number" id="dD" min="5" max="600" step="1"></label>
+          <label>Height cm <input type="number" id="dH" min="1" max="300" step="1"></label>
+        </div>
+        <div class="row2" id="dChaiseRow">
+          <label class="field" style="flex:1">Chaise depth cm <input type="number" id="dCD" min="0" max="300" step="1"></label>
+          <label class="field" style="flex:1">Chaise side
+            <select id="dCS"><option value="right">Right, seen from the front</option><option value="left">Left, seen from the front</option></select></label>
+        </div>
+        <p class="status" id="dNote"></p>
+        <div class="row2">
+          <button class="btn" type="button" id="dPlace">Place in model</button>
+          <button class="btn ghost" type="button" id="dCancel">Cancel</button>
+          <a class="linkish" id="dLink" target="_blank" rel="noopener">Check size on IKEA</a>
+        </div>
+      </div>
+
+      <div class="stack">
+        <h2>Grid</h2>
+        <div class="seg" role="group" aria-label="Grid size" id="gridSeg">
+          <button data-g="0" aria-pressed="false">Off</button>
+          <button data-g="0.05" aria-pressed="false">5 cm</button>
+          <button data-g="0.1" aria-pressed="true">10 cm</button>
+          <button data-g="0.25" aria-pressed="false">25 cm</button>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="snapWalls" checked> Snap flush to walls</label>
+          <label><input type="checkbox" id="showGrid" checked> Show grid</label>
+        </div>
+      </div>
+
+      <div class="stack">
+        <h2 id="placedTitle">In the apartment</h2>
+        <ul class="placed" id="placed" aria-label="Placed furniture"></ul>
+        <p class="note">Click a piece in the model to select it, then drag to move it.
+          <kbd>R</kbd> rotates 90°, arrow keys nudge one grid step, <kbd>Del</kbd> removes, <kbd>Esc</kbd> deselects.</p>
+      </div>
     </section>
-    <section>
-      <h2>How it was built</h2>
-      <p class="note">Walls and floors are traced from the brochure's vector plan and scaled with its own 0–10 m bar
-        (<span id="ptm"></span> pt per metre). Areas in m². Room height <span id="wh"></span> m, door heads 2.10 m and window sills
-        0.90 m are assumptions, since the plan gives no heights. Door leaves are left out so openings stay readable.</p>
+
+    <section class="panel" id="p-rooms" role="tabpanel" aria-labelledby="t-rooms" hidden>
+      <div>
+        <h2>Rooms · click to focus</h2>
+        <table>
+          <thead><tr><th>Room</th><th>Plan BF</th><th>Model</th></tr></thead>
+          <tbody id="rooms"></tbody>
+          <tfoot><tr><td>Apartment</td><td class="n">94.0</td><td class="n" id="total"></td></tr></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" id="p-about" role="tabpanel" aria-labelledby="t-about" hidden>
+      <div>
+        <h2>How the model was built</h2>
+        <p class="note">Walls and floors are traced from the brochure's vector plan and scaled with its own 0–10 m bar
+          (<span id="ptm"></span> pt per metre). Areas in m². Room height <span id="wh"></span> m, door heads 2.10 m and window sills
+          0.90 m are assumptions, since the plan gives no heights. Door leaves are left out so openings stay readable.</p>
+      </div>
+      <div>
+        <h2>Where furniture sizes come from</h2>
+        <p class="note">This page can't open ikea.com itself, so it reads the product name and article number from the link.
+          Sizes come from a built-in list of common IKEA products checked against IKEA's published measurements.
+          Products not on the list get an estimate from Claude, which can't browse either, or a typical size for the shape.
+          Estimates are marked. Check them against the IKEA product page and correct the numbers before you rely on a fit.</p>
+      </div>
     </section>
   </aside>
 </div>
@@ -205,6 +332,7 @@ new GLTFLoader().parse(bytes.buffer, "", (gltf) => {
   addLabels();
   setCut(Number($("cut").value));
   setView("3d", true);
+  rebuildGrid(); // needs the model centre
 }, (e) => { $("hint").textContent = "The model could not be loaded: " + e.message; });
 
 // ---------- labels ----------
@@ -352,6 +480,787 @@ function updateHud() {
 }
 $("compass").style.overflow = "visible";
 $("compass").style.color = "var(--fg)";
+
+// ---------- panel tabs ----------
+for (const t of ["furnish", "rooms", "about"]) {
+  $("t-" + t).onclick = () => {
+    for (const u of ["furnish", "rooms", "about"]) {
+      $("t-" + u).setAttribute("aria-selected", String(u === t));
+      $("p-" + u).hidden = u !== t;
+    }
+  };
+}
+
+// =====================================================================
+// Furniture planner
+// =====================================================================
+// Sizes in cm as IKEA lists them: width (side to side seen from the front),
+// depth (front to back; for beds the length), height. Matched against the
+// product link's slug, so every colour/fabric variant of a product matches.
+const CATALOG = [
+  { re: /vimle.*4-seat-sofa-with-chaise-longue/, type: "sofa", w: 336, d: 98, h: 83, chaise: 164 },
+  { re: /vimle.*3-seat-sofa-with-chaise-longue/, type: "sofa", w: 252, d: 98, h: 83, chaise: 164 },
+  { re: /kivik.*3-seat-sofa(?!-with)/, type: "sofa", w: 228, d: 95, h: 83 },
+  { re: /malm.*bed-frame-high/, type: "bed", w: 176, d: 209, h: 100, note: "Size for the 160×200 cm mattress version." },
+  { re: /strandmon.*wing-chair/, type: "armchair", w: 82, d: 96, h: 101 },
+  { re: /poang.*armchair/, type: "armchair", w: 68, d: 82, h: 100 },
+  { re: /ekedalen.*extendable-table/, type: "table", w: 120, d: 80, h: 75, note: "Extends to 180 cm." },
+  { re: /lack.*coffee-table/, type: "table", w: 90, d: 55, h: 45 },
+  { re: /lack.*side-table/, type: "table", w: 55, d: 55, h: 45 },
+  { re: /micke.*desk/, type: "desk", w: 105, d: 50, h: 75 },
+  { re: /hemnes.*8-drawer-dresser|hemnes.*chest-of-8-drawers/, type: "storage", w: 160, d: 50, h: 95 },
+  { re: /brimnes.*tv-bench/, type: "storage", w: 180, d: 41, h: 53 },
+  { re: /billy.*bookcase/, type: "shelving", w: 80, d: 28, h: 202 },
+  { re: /kallax.*shelving-unit/, type: "shelving", w: 77, d: 39, h: 147 },
+  { re: /pax.*wardrobe/, type: "storage", w: 100, d: 58, h: 201 },
+];
+
+const SHAPES = {
+  sofa:     { label: "Sofa",             def: [220, 95, 83] },
+  armchair: { label: "Armchair",         def: [80, 85, 95] },
+  bed:      { label: "Bed",              def: [176, 209, 100] },
+  table:    { label: "Table",            def: [140, 80, 75] },
+  desk:     { label: "Desk",             def: [120, 60, 75] },
+  chair:    { label: "Chair",            def: [45, 52, 82] },
+  storage:  { label: "Cabinet / drawers", def: [80, 45, 95] },
+  shelving: { label: "Open shelving",    def: [80, 30, 180] },
+  rug:      { label: "Rug",              def: [170, 240, 1] },
+  lamp:     { label: "Floor lamp",       def: [40, 40, 150] },
+  box:      { label: "Plain block",      def: [100, 60, 75] },
+};
+// slug keyword -> shape, first match wins (order matters: "sofa-bed" is a sofa)
+const SHAPE_RULES = [
+  [/sofa|couch|loveseat|daybed|chaise/, "sofa"], [/armchair|wing-chair|easy-chair|rocking-chair/, "armchair"],
+  [/bed-frame|(^|-)bed(-|$)|bunk-bed|loft-bed/, "bed"], [/desk|workstation/, "desk"],
+  [/bookcase|shelving|shelf-unit|shelves/, "shelving"],
+  [/wardrobe|cabinet|dresser|chest-of|drawer|sideboard|tv-bench|tv-unit|storage|bedside-table|nightstand/, "storage"],
+  [/table/, "table"], [/chair|stool|bench/, "chair"], [/rug|carpet/, "rug"], [/lamp|light/, "lamp"],
+];
+const SIZE_HINTS = [ // typical sizes when a slug names a sub-type
+  [/coffee-table/, [90, 55, 45]], [/side-table|bedside/, [50, 40, 55]], [/tv-bench|tv-unit/, [160, 40, 50]],
+  [/wardrobe/, [100, 58, 201]], [/dining-table/, [140, 80, 75]], [/2-seat/, [160, 90, 80]], [/3-seat/, [220, 95, 83]],
+  [/4-seat/, [290, 98, 83]], [/stool/, [40, 40, 45]],
+];
+const COLOURS = [
+  ["dark-grey", "#4a4d50"], ["light-grey", "#bfc2c4"], ["medium-grey", "#8a8d90"], ["anthracite", "#3c3e41"],
+  ["grey-green", "#7d8a7c"], ["grey", "#8f9295"], ["black-brown", "#3b2f29"], ["black", "#2b2b2d"],
+  ["white-stained-oak", "#e2d6c3"], ["white", "#f1f0ec"], ["beige", "#d4c5ab"], ["light-blue", "#9fb6c8"],
+  ["dark-blue", "#2f4258"], ["blue", "#4f6d8f"], ["dark-green", "#3f5641"], ["green", "#5d7a5a"],
+  ["dark-brown", "#4b3426"], ["brown", "#6e5040"], ["oak", "#c9a77c"], ["birch", "#dcc49c"], ["walnut", "#6b4a32"],
+  ["pine", "#d9b98a"], ["bamboo", "#cfb27e"], ["red", "#a33a32"], ["yellow", "#d9b74a"], ["pink", "#d8a5a8"],
+  ["turquoise", "#4a9a98"], ["natural", "#d8c3a0"], ["anthracite", "#3c3e41"],
+];
+
+function parseIkeaUrl(text) {
+  let u;
+  try { u = new URL(text.trim()); } catch { return null; }
+  if (!/(^|\.)ikea\.[a-z.]+$/i.test(u.hostname)) return null;
+  const segs = u.pathname.split("/").filter(Boolean);
+  const pi = segs.indexOf("p");
+  const raw = decodeURIComponent((pi >= 0 ? segs[pi + 1] : segs.at(-1)) || "").toLowerCase();
+  if (!raw) return null;
+  const m = raw.match(/^(.*?)-?(s?\d{8})$/);
+  const slug = (m ? m[1] : raw).normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const article = m ? m[2] : null;
+  const words = slug.split("-");
+  const family = words[0].toUpperCase();
+  const desc = words.slice(1).join(" ").replace(/(\d) seat/g, "$1-seat").replace(/\b(\d+)x(\d+)/g, "$1×$2 cm");
+  return { url: u.href, slug, article, family, desc };
+}
+const fmtArticle = (a) => {
+  if (!a) return "";
+  const d = a.replace(/\D/g, "");
+  return `${a.startsWith("s") ? "S" : ""}${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+};
+function coloursFromSlug(slug) {
+  const found = [];
+  let rest = "-" + slug + "-";
+  for (const [k, hex] of COLOURS) {
+    const i = rest.indexOf("-" + k + "-");
+    if (i >= 0) { found.push([i, hex]); rest = rest.slice(0, i) + "-" + "_".repeat(k.length) + rest.slice(i + k.length + 1); }
+  }
+  found.sort((a, b) => a[0] - b[0]);
+  return [found[0]?.[1] ?? "#9a9c9e", found[1]?.[1] ?? null];
+}
+function shapeFromSlug(slug) {
+  for (const [re, s] of SHAPE_RULES) if (re.test(slug)) return s;
+  return "box";
+}
+
+// ---- size lookup: catalogue -> numbers in the link -> Claude -> typical size
+function lookupSize(p) {
+  const hit = CATALOG.find((c) => c.re.test(p.slug));
+  if (hit && !/\d+x\d+/.test(p.slug.replace(/160x200/, "")))
+    return { type: hit.type, w: hit.w, d: hit.d, h: hit.h, chaise: hit.chaise ?? 0, src: "catalog", note: hit.note ?? "" };
+  const type = hit?.type ?? shapeFromSlug(p.slug);
+  const nums = p.slug.match(/(\d{2,3})x(\d{2,3})(?:x(\d{2,3}))?/);
+  if (nums) {
+    const [a, b, c] = [nums[1], nums[2], nums[3]].map((v) => (v ? Number(v) : null));
+    let w, d, h;
+    if (type === "bed") { w = a + 16; d = b + 9; h = SHAPES.bed.def[2]; }
+    else if (c) { [w, d, h] = [a, b, c]; }
+    else if (type === "shelving" || type === "storage") { [w, d, h] = [a, SHAPES[type].def[1], b]; }
+    else { [w, d, h] = [a, b, SHAPES[type].def[2]]; }
+    return { type, w, d, h, chaise: /chaise/.test(p.slug) ? 160 : 0, src: "link",
+      note: type === "bed" ? `Mattress ${a}×${b} cm; frame size estimated around it.` : "" };
+  }
+  const hint = SIZE_HINTS.find(([re]) => re.test(p.slug));
+  const [w, d, h] = hint ? hint[1] : SHAPES[type].def;
+  return { type, w, d, h, chaise: /chaise/.test(p.slug) ? 160 : 0, src: "typical", note: "" };
+}
+
+let samplePromise = null;
+function getSample() {
+  if (!samplePromise) samplePromise = (window.claude?.use ? window.claude.use("sample") : Promise.resolve(null)).catch(() => null);
+  return samplePromise;
+}
+getSample(); // resolves the namespace only; nothing is asked until a call
+let sampleBlocked = false;
+async function askClaudeForSize(p) {
+  const sample = await getSample();
+  if (!sample || sampleBlocked) return null;
+  const prompt = `I am placing IKEA furniture in a to-scale 3D floor plan.
+Product page: ${p.url}
+From the link: ${p.family}, ${p.desc}. Article number ${fmtArticle(p.article) || "unknown"}.
+You cannot open the page. From what you know about this IKEA product, give its overall assembled size in centimetres.
+width = side to side seen from the front; depth = front to back (for beds: the total length); height = overall height.
+Reply with only this JSON:
+{"shape": one of ${JSON.stringify(Object.keys(SHAPES))}, "width_cm": number, "depth_cm": number, "height_cm": number,
+ "chaise_depth_cm": number or null, "confident": true if you know this exact product's listed measurements, else false,
+ "note": "at most 12 words"}`;
+  try {
+    const r = await sample.json(prompt, { modelTier: "default", cache: { gcTime: 86400000 } });
+    const n = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : null);
+    if (!n(r?.width_cm) || !n(r?.depth_cm) || !n(r?.height_cm)) return null;
+    return { type: SHAPES[r.shape] ? r.shape : null, w: n(r.width_cm), d: n(r.depth_cm), h: n(r.height_cm),
+      chaise: n(r.chaise_depth_cm) ?? 0, confident: !!r.confident, note: String(r.note ?? "").slice(0, 120) };
+  } catch (e) {
+    if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e?.code)) sampleBlocked = true;
+    return { error: e?.code ?? "upstream_error" };
+  }
+}
+
+// ---- 3D builders. Local frame: x = width, z = depth (back at -z), y up, origin at footprint centre.
+const furnRoot = new THREE.Group();
+scene.add(furnRoot);
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x1d2328, transparent: true, opacity: 0.35, clippingPlanes: [cutPlane] });
+function shade(hex, k) { const c = new THREE.Color(hex); c.offsetHSL(0, 0, k); return c; }
+function makeMat(hex) {
+  return new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.9, clippingPlanes: [cutPlane] });
+}
+function blk(g, mat, x0, x1, y0, y1, z0, z1) {
+  const w = x1 - x0, h = y1 - y0, d = z1 - z0;
+  if (w <= 0.001 || h <= 0.001 || d <= 0.001) return;
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  m.castShadow = true; m.receiveShadow = true;
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
+  m.add(e);
+  g.add(m);
+}
+function buildSofa(g, it, mats) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100;
+  const armchair = it.type === "armchair";
+  const a = /wide-armrests/.test(it.slug ?? "") ? 0.22 : Math.min(armchair ? 0.16 : 0.15, w * 0.12);
+  const legH = 0.06, baseTop = Math.min(0.30, h * 0.36), seatTop = Math.min(0.48, h * 0.6);
+  const armTop = Math.min(0.62, h * 0.72), backD = Math.min(0.26, d * 0.27);
+  const D = Math.max(d, it.chaise / 100 || 0);
+  const z0 = -D / 2, zf = z0 + d; // back face, front face of the main seat
+  const { main, dark, cush } = mats;
+  blk(g, dark, -w / 2 + 0.04, w / 2 - 0.04, 0, legH, z0 + 0.04, zf - 0.04);
+  blk(g, main, -w / 2, w / 2, legH, baseTop, z0, zf);
+  blk(g, cush, -w / 2 + a, w / 2 - a, baseTop, seatTop, z0 + backD, zf);
+  blk(g, main, -w / 2 + a, w / 2 - a, baseTop, h, z0, z0 + backD);
+  const rects = [[-w / 2, z0, w / 2, zf]];
+  if (it.chaise / 100 > d + 0.05 && !armchair) {
+    const s = it.chaiseSide === "left" ? -1 : 1;
+    const cw = Math.min(0.98, w * 0.42);
+    const xa = s > 0 ? w / 2 - cw : -w / 2, xb = s > 0 ? w / 2 : -w / 2 + cw;
+    blk(g, dark, xa + 0.04, xb - 0.04, 0, legH, zf - 0.04, z0 + D - 0.04);
+    blk(g, main, xa, xb, legH, baseTop, zf, z0 + D);
+    const ia = s > 0 ? xa : xa + a, ib = s > 0 ? xb - a : xb;
+    blk(g, cush, ia, ib, baseTop, seatTop, zf - 0.02, z0 + D);
+    rects.push([xa, zf, xb, z0 + D]);
+    // the arm on the chaise side runs the full depth
+    if (s > 0) { blk(g, main, w / 2 - a, w / 2, baseTop, armTop, z0, z0 + D); blk(g, main, -w / 2, -w / 2 + a, baseTop, armTop, z0, zf); }
+    else { blk(g, main, -w / 2, -w / 2 + a, baseTop, armTop, z0, z0 + D); blk(g, main, w / 2 - a, w / 2, baseTop, armTop, z0, zf); }
+  } else {
+    blk(g, main, -w / 2, -w / 2 + a, baseTop, armTop, z0, zf);
+    blk(g, main, w / 2 - a, w / 2, baseTop, armTop, z0, zf);
+  }
+  return rects;
+}
+function buildBed(g, it, { main, dark, cush }) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100;
+  const frameTop = Math.min(0.38, h * 0.4), mat = new THREE.MeshStandardMaterial({ color: 0xf4f3ef, roughness: 1, clippingPlanes: [cutPlane] });
+  blk(g, main, -w / 2, w / 2, 0, frameTop, -d / 2 + 0.06, d / 2);
+  blk(g, mat, -w / 2 + 0.07, w / 2 - 0.07, frameTop - 0.12, frameTop + 0.08, -d / 2 + 0.07, d / 2 - 0.03);
+  blk(g, main, -w / 2, w / 2, 0, h, -d / 2, -d / 2 + 0.06);
+  blk(g, cush, -w / 2 + 0.2, -0.05, frameTop + 0.08, frameTop + 0.18, -d / 2 + 0.1, -d / 2 + 0.55);
+  blk(g, cush, 0.05, w / 2 - 0.2, frameTop + 0.08, frameTop + 0.18, -d / 2 + 0.1, -d / 2 + 0.55);
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+function buildTable(g, it, { main, dark }) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, t = 0.03, l = Math.min(0.05, w * 0.1), i = 0.04;
+  blk(g, main, -w / 2, w / 2, h - t, h, -d / 2, d / 2);
+  const legs = dark ?? main;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = sx * (w / 2 - i - l / 2), z = sz * (d / 2 - i - l / 2);
+    blk(g, legs, x - l / 2, x + l / 2, 0, h - t, z - l / 2, z + l / 2);
+  }
+  if (it.type === "desk") blk(g, main, -w / 2 + i, w / 2 - i, h - 0.12, h - t, -d / 2 + i, -d / 2 + i + 0.02);
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+function buildChair(g, it, { main, dark }) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, seat = Math.min(0.46, h * 0.56), l = 0.035;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1])
+    blk(g, dark ?? main, sx * (w / 2 - l) - l / 2, sx * (w / 2 - l) + l / 2, 0, seat - 0.04, sz * (d / 2 - l) - l / 2, sz * (d / 2 - l) + l / 2);
+  blk(g, main, -w / 2, w / 2, seat - 0.04, seat, -d / 2, d / 2);
+  if (h > seat + 0.1) blk(g, main, -w / 2, w / 2, seat, h, -d / 2, -d / 2 + 0.04);
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+function buildStorage(g, it, { main, dark }) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, t = 0.018;
+  if (it.type === "shelving") {
+    blk(g, main, -w / 2, -w / 2 + t, 0, h, -d / 2, d / 2);
+    blk(g, main, w / 2 - t, w / 2, 0, h, -d / 2, d / 2);
+    blk(g, main, -w / 2, w / 2, 0, 0.06, -d / 2, d / 2);
+    blk(g, main, -w / 2, w / 2, h - t, h, -d / 2, d / 2);
+    blk(g, main, -w / 2 + t, w / 2 - t, 0.06, h - t, -d / 2, -d / 2 + 0.008);
+    const n = Math.max(1, Math.round(h / 0.36) - 1);
+    for (let k = 1; k <= n; k++) { const y = 0.06 + (h - 0.06) * k / (n + 1); blk(g, main, -w / 2 + t, w / 2 - t, y - t / 2, y + t / 2, -d / 2, d / 2); }
+    // KALLAX-style cubes get vertical dividers too
+    if (/kallax/.test(it.slug ?? "")) { const c = Math.max(1, Math.round(w / 0.39)); for (let k = 1; k < c; k++) { const x = -w / 2 + w * k / c; blk(g, main, x - t / 2, x + t / 2, 0.06, h - t, -d / 2, d / 2); } }
+  } else {
+    blk(g, dark ?? main, -w / 2 + 0.03, w / 2 - 0.03, 0, 0.08, -d / 2 + 0.03, d / 2 - 0.05);
+    blk(g, main, -w / 2, w / 2, 0.08, h, -d / 2, d / 2 - 0.02);
+    const rows = h > 1.6 ? 1 : Math.max(1, Math.round((h - 0.08) / 0.2));
+    const cols = h > 1.6 ? Math.max(1, Math.round(w / 0.5)) : (w > 1.1 ? 2 : 1);
+    const front = shade(main.color, 0.04);
+    const fm = new THREE.MeshStandardMaterial({ color: front, roughness: 0.85, clippingPlanes: [cutPlane] });
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const x0 = -w / 2 + 0.01 + (w - 0.02) * c / cols, x1 = -w / 2 + 0.01 + (w - 0.02) * (c + 1) / cols;
+      const y0 = 0.09 + (h - 0.1) * r / rows, y1 = 0.09 + (h - 0.1) * (r + 1) / rows;
+      blk(g, fm, x0 + 0.003, x1 - 0.003, y0 + 0.003, y1 - 0.003, d / 2 - 0.02, d / 2);
+    }
+  }
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+function buildRug(g, it, { main }) {
+  const w = it.w / 100, d = it.d / 100;
+  blk(g, main, -w / 2, w / 2, 0.001, Math.max(0.006, it.h / 100), -d / 2, d / 2);
+  return []; // rugs never collide
+}
+function buildLamp(g, it, { main, dark }) {
+  const w = it.w / 100, h = it.h / 100;
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.35, w * 0.35, 0.03, 24), dark ?? main);
+  base.position.y = 0.015; g.add(base);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, h - 0.3, 8), dark ?? main);
+  pole.position.y = (h - 0.3) / 2; g.add(pole);
+  const shadeM = new THREE.MeshStandardMaterial({ color: 0xf6efe1, emissive: 0x6b5a3a, roughness: 1, clippingPlanes: [cutPlane] });
+  const s = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.35, w / 2, 0.3, 24, 1, true), shadeM);
+  s.material.side = THREE.DoubleSide; s.position.y = h - 0.15; g.add(s);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return [[-w / 2, -w / 2, w / 2, w / 2]];
+}
+function buildItem(it) {
+  const g = new THREE.Group();
+  const main = makeMat(it.colour);
+  const mats = { main, dark: it.colour2 ? makeMat(it.colour2) : makeMat(shade(it.colour, -0.25).getStyle()),
+    cush: makeMat(shade(it.colour, 0.05).getStyle()) };
+  const fn = { sofa: buildSofa, armchair: buildSofa, bed: buildBed, table: buildTable, desk: buildTable, chair: buildChair,
+    storage: buildStorage, shelving: buildStorage, rug: buildRug, lamp: buildLamp }[it.type];
+  let rects;
+  if (fn) rects = fn(g, it, mats);
+  else { blk(g, main, -it.w / 200, it.w / 200, 0, it.h / 100, -it.d / 200, it.d / 200); rects = [[-it.w / 200, -it.d / 200, it.w / 200, it.d / 200]]; }
+  g.userData.rects = rects;
+  g.userData.itemId = it.id;
+  g.traverse((o) => { o.userData.itemId = it.id; });
+  return g;
+}
+
+// ---- footprint geometry, obstacles, collisions
+const OBST = [...INFO.obstacles.walls.map((p) => ({ rings: p, wall: true })), ...INFO.obstacles.fixtures.map((p) => ({ rings: p, wall: false }))];
+for (const o of OBST) {
+  const xs = o.rings[0].map((v) => v[0]), zs = o.rings[0].map((v) => v[1]);
+  o.bb = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
+}
+function inRing(x, z, r) {
+  let c = false;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    const [xi, zi] = r[i], [xj, zj] = r[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+  }
+  return c;
+}
+function hitsObstacle(x, z) {
+  for (const o of OBST) {
+    if (x < o.bb[0] || x > o.bb[2] || z < o.bb[1] || z > o.bb[3]) continue;
+    if (inRing(x, z, o.rings[0]) && !o.rings.slice(1).some((h) => inRing(x, z, h))) return o.wall ? "wall" : "fixture";
+  }
+  return null;
+}
+// world-space footprint rectangles of an item at (x, z, rot)
+function worldRects(it, x = it.x, z = it.z, rot = it.rot) {
+  const c = Math.cos(rot * Math.PI / 180), s = Math.sin(rot * Math.PI / 180);
+  return (it.rects ?? []).map(([x0, z0, x1, z1]) => {
+    const pts = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(([lx, lz]) => [x + lx * c + lz * s, z - lx * s + lz * c]);
+    return { pts, local: [x0, z0, x1, z1], c, s, x, z };
+  });
+}
+function inWorldRect(px, pz, r, pad = 0) {
+  const dx = px - r.x, dz = pz - r.z;
+  const lx = dx * r.c - dz * r.s, lz = dx * r.s + dz * r.c;
+  return lx > r.local[0] + pad && lx < r.local[2] - pad && lz > r.local[1] + pad && lz < r.local[3] - pad;
+}
+function aabb(rects) {
+  let a = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const r of rects) for (const [x, z] of r.pts) a = [Math.min(a[0], x), Math.min(a[1], z), Math.max(a[2], x), Math.max(a[3], z)];
+  return a;
+}
+// Sample the footprint every 4 cm (1 cm in from the edge so flush placement is allowed).
+function collisions(it, x = it.x, z = it.z, rot = it.rot) {
+  const out = new Set();
+  const rects = worldRects(it, x, z, rot);
+  const others = items.filter((o) => o.id !== it.id && o.type !== "rug").map((o) => ({ o, rs: worldRects(o), bb: aabb(worldRects(o)) }));
+  const step = 0.04, pad = 0.01;
+  for (const r of rects) {
+    const [x0, z0, x1, z1] = r.local;
+    for (let lx = x0 + pad; lx <= x1 - pad + 1e-6; lx += Math.min(step, Math.max(0.005, x1 - x0 - 2 * pad))) {
+      for (let lz = z0 + pad; lz <= z1 - pad + 1e-6; lz += Math.min(step, Math.max(0.005, z1 - z0 - 2 * pad))) {
+        const px = x + lx * r.c + lz * r.s, pz = z - lx * r.s + lz * r.c;
+        const h = hitsObstacle(px, pz);
+        if (h) out.add(h);
+        for (const q of others) {
+          if (px < q.bb[0] || px > q.bb[2] || pz < q.bb[1] || pz > q.bb[3]) continue;
+          if (q.rs.some((rr) => inWorldRect(px, pz, rr))) out.add("item");
+        }
+        if (out.size === 3) return out;
+      }
+    }
+  }
+  return out;
+}
+
+// ---- snapping
+let gridStep = 0.1;
+// inner north-west corner of the living room, so grid lines run along its walls
+const GRID_ORIGIN = { x: INFO.grid_origin[0], z: INFO.grid_origin[1] };
+const WALL_SEGS = [];
+for (const o of OBST) for (const ring of o.rings) for (let i = 0; i < ring.length - 1; i++) {
+  const [ax, az] = ring[i], [bx, bz] = ring[i + 1];
+  if (Math.abs(ax - bx) < 1e-3 && Math.abs(az - bz) > 0.05) WALL_SEGS.push({ v: true, c: ax, a: Math.min(az, bz), b: Math.max(az, bz) });
+  else if (Math.abs(az - bz) < 1e-3 && Math.abs(ax - bx) > 0.05) WALL_SEGS.push({ v: false, c: az, a: Math.min(ax, bx), b: Math.max(ax, bx) });
+}
+function snapPosition(it, x, z) {
+  const rot = it.rot;
+  if (gridStep > 0) {
+    // snap the footprint's min corner to the grid so edges line up with grid lines
+    const bb = aabb(worldRects(it, x, z, rot));
+    x += Math.round((bb[0] - GRID_ORIGIN.x) / gridStep) * gridStep + GRID_ORIGIN.x - bb[0];
+    z += Math.round((bb[1] - GRID_ORIGIN.z) / gridStep) * gridStep + GRID_ORIGIN.z - bb[1];
+  }
+  if ($("snapWalls").checked) {
+    const TH = Math.max(0.12, gridStep * 0.75);
+    const bb = aabb(worldRects(it, x, z, rot));
+    let bestX = null, bestZ = null;
+    for (const s of WALL_SEGS) {
+      if (s.v && s.a < bb[3] - 0.02 && s.b > bb[1] + 0.02) {
+        for (const edge of [bb[0], bb[2]]) { const dx = s.c - edge; if (Math.abs(dx) < TH && (bestX === null || Math.abs(dx) < Math.abs(bestX))) {
+          if (!collisions(it, x + dx, z, rot).has("wall")) bestX = dx; } }
+      } else if (!s.v && s.a < bb[2] - 0.02 && s.b > bb[0] + 0.02) {
+        for (const edge of [bb[1], bb[3]]) { const dz = s.c - edge; if (Math.abs(dz) < TH && (bestZ === null || Math.abs(dz) < Math.abs(bestZ))) {
+          if (!collisions(it, x, z + dz, rot).has("wall")) bestZ = dz; } }
+      }
+    }
+    if (bestX !== null) x += bestX;
+    if (bestZ !== null) z += bestZ;
+  }
+  return [x, z];
+}
+
+// ---- grid helper
+let gridMesh = null;
+function rebuildGrid() {
+  if (gridMesh) { scene.remove(gridMesh); gridMesh.geometry.dispose(); gridMesh = null; }
+  if (!gridStep) return;
+  const size = 16, n = Math.round(size / gridStep);
+  const major = gridStep >= 0.25 ? 4 : Math.round(1 / gridStep);
+  gridMesh = new THREE.GridHelper(size, n, 0x000000, 0x000000);
+  // colour every metre line stronger
+  const col = gridMesh.geometry.attributes.color;
+  for (let i = 0; i < col.count; i += 2) {
+    const line = Math.floor((i % ((n + 1) * 4)) / 2) % (n + 1);
+    const strong = (line - n / 2) % major === 0;
+    const v = strong ? 0.35 : 0.62;
+    col.setXYZ(i, v, v, v); col.setXYZ(i + 1, v, v, v);
+  }
+  gridMesh.material.transparent = true; gridMesh.material.opacity = 0.35; gridMesh.material.depthWrite = false;
+  // centre on the apartment, shifted so grid lines pass through GRID_ORIGIN
+  const half = (n % 2) * gridStep / 2;
+  const cx = GRID_ORIGIN.x + Math.round((center.x - GRID_ORIGIN.x) / gridStep) * gridStep + half;
+  const cz = GRID_ORIGIN.z + Math.round((center.z - GRID_ORIGIN.z) / gridStep) * gridStep + half;
+  gridMesh.position.set(cx, 0.004, cz);
+  gridMesh.renderOrder = 2;
+  scene.add(gridMesh);
+  updateGridVisibility();
+}
+function updateGridVisibility() {
+  if (gridMesh) gridMesh.visible = $("showGrid").checked && (!!pending || !!selectedId || dragging);
+}
+for (const b of $("gridSeg").querySelectorAll("button")) {
+  b.onclick = () => {
+    gridStep = Number(b.dataset.g);
+    for (const o of $("gridSeg").querySelectorAll("button")) o.setAttribute("aria-pressed", String(o === b));
+    rebuildGrid(); savePrefs();
+  };
+}
+$("showGrid").onchange = () => { updateGridVisibility(); savePrefs(); };
+$("snapWalls").onchange = savePrefs;
+
+// ---- state
+const STORE = "l0802-furniture-v1";
+let items = [];
+let selectedId = null, pending = null, dragging = false, editingId = null;
+const groups = new Map(); // id -> THREE.Group
+const dimLabel = (() => { const el = document.createElement("div"); el.className = "lbl fdim"; const o = new CSS2DObject(el); o.visible = false; scene.add(o); return o; })();
+const selOutline = new THREE.Group(); scene.add(selOutline);
+
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify({ items: items.map(({ rects, ...rest }) => rest) })); } catch {}
+}
+function savePrefs() {
+  try { localStorage.setItem(STORE + "-prefs", JSON.stringify({ grid: gridStep, walls: $("snapWalls").checked, show: $("showGrid").checked })); } catch {}
+}
+function load() {
+  try {
+    const p = JSON.parse(localStorage.getItem(STORE + "-prefs") || "null");
+    if (p) {
+      gridStep = p.grid; $("snapWalls").checked = p.walls; $("showGrid").checked = p.show;
+      for (const o of $("gridSeg").querySelectorAll("button")) o.setAttribute("aria-pressed", String(Number(o.dataset.g) === gridStep));
+    }
+  } catch {}
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (s && Array.isArray(s.items)) return s.items;
+  } catch {}
+  return null;
+}
+
+function sizeText(it) {
+  const deep = it.chaise > it.d && (it.type === "sofa") ? `${it.d}/${it.chaise}` : `${it.d}`;
+  return `${it.w} × ${deep} × ${it.h} cm`;
+}
+function refreshItem(it) {
+  const old = groups.get(it.id);
+  if (old) { furnRoot.remove(old); old.traverse((o) => { o.geometry?.dispose?.(); }); }
+  const g = buildItem(it);
+  it.rects = g.userData.rects;
+  g.position.set(it.x, 0, it.z);
+  g.rotation.y = it.rot * Math.PI / 180;
+  furnRoot.add(g); groups.set(it.id, g);
+}
+function placeGroup(it) {
+  const g = groups.get(it.id); if (!g) return;
+  g.position.set(it.x, 0, it.z); g.rotation.y = it.rot * Math.PI / 180;
+}
+function tint(g, bad) {
+  g.traverse((o) => { if (o.isMesh && o.material.emissive) { o.material.emissive.set(bad ? 0x8f1d1d : 0x000000); o.material.emissiveIntensity = bad ? 0.55 : 1; } });
+}
+function statusOf(it) {
+  if (it.type === "rug") return { cls: "ok", text: "Fits" };
+  const c = collisions(it);
+  if (c.has("wall")) return { cls: "bad", text: "Hits a wall" };
+  if (c.has("fixture")) return { cls: "bad", text: "Hits a fixture" };
+  if (c.has("item")) return { cls: "warn", text: "Overlaps furniture" };
+  return { cls: "ok", text: "Fits" };
+}
+function srcChip(it) {
+  return { catalog: ["info", "IKEA size"], link: ["info", "Size from link"], claude: ["warn", "Claude estimate"],
+    claudeKnown: ["info", "Claude, from memory"], typical: ["warn", "Typical size"], manual: ["info", "Your size"] }[it.src] ?? ["info", ""];
+}
+function renderList() {
+  const ul = $("placed"); ul.innerHTML = "";
+  $("placedTitle").textContent = `In the apartment · ${items.length}`;
+  if (!items.length) {
+    const li = document.createElement("li"); li.className = "empty"; li.style.cursor = "default";
+    li.textContent = "Nothing placed yet. Paste an IKEA product link above to add your first piece.";
+    ul.appendChild(li);
+  }
+  for (const it of items) {
+    const st = statusOf(it);
+    tint(groups.get(it.id), st.cls === "bad");
+    const li = document.createElement("li");
+    li.setAttribute("aria-selected", String(it.id === selectedId));
+    li.tabIndex = 0;
+    li.innerHTML = `<span class="sw"></span><span class="nm"></span>
+      <span class="icons"><button title="Rotate 90°" aria-label="Rotate 90 degrees" data-a="rot">⟳</button><button title="Edit size" aria-label="Edit size" data-a="edit">✎</button><button title="Duplicate" aria-label="Duplicate" data-a="dup">⧉</button><button title="Remove" aria-label="Remove" data-a="del">✕</button></span>
+      <span class="meta"><span class="n"></span><span class="chip ${st.cls}">${st.text}</span>${it.example ? '<span class="chip info">Example</span>' : ""}</span>`;
+    li.querySelector(".sw").style.background = it.colour;
+    li.querySelector(".nm").textContent = `${it.family} · ${it.desc}`;
+    li.querySelector(".nm").title = `${it.family} ${it.desc}`;
+    li.querySelector(".n").textContent = sizeText(it);
+    li.onclick = (e) => {
+      const a = e.target.closest("button")?.dataset.a;
+      if (a === "rot") rotateItem(it, 90);
+      else if (a === "del") removeItem(it);
+      else if (a === "dup") duplicateItem(it);
+      else if (a === "edit") openDraft(it, "edit");
+      else { select(it.id); focusOn(it.x, it.z); }
+    };
+    li.onkeydown = (e) => { if (e.target === li && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); select(it.id); focusOn(it.x, it.z); } };
+    ul.appendChild(li);
+  }
+  updateSelectionVisuals();
+}
+function updateSelectionVisuals() {
+  for (const c of [...selOutline.children]) { selOutline.remove(c); c.geometry.dispose(); }
+  const it = items.find((i) => i.id === selectedId) ?? pending;
+  dimLabel.visible = !!it;
+  if (it) {
+    for (const r of worldRects(it)) {
+      const pts = [...r.pts, r.pts[0]].map(([x, z]) => new THREE.Vector3(x, 0.012, z));
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: accent(), depthTest: false }));
+      line.renderOrder = 11; selOutline.add(line);
+    }
+    dimLabel.element.textContent = sizeText(it);
+    dimLabel.position.set(it.x, it.h / 100 + 0.15, it.z);
+  }
+  updateGridVisibility();
+}
+function select(id) {
+  selectedId = id;
+  for (const li of $("placed").querySelectorAll("li")) li.setAttribute("aria-selected", "false");
+  renderList();
+}
+function rotateItem(it, deg) {
+  it.rot = ((it.rot + deg) % 360 + 360) % 360;
+  [it.x, it.z] = snapPosition(it, it.x, it.z);
+  placeGroup(it); save(); renderList();
+}
+function removeItem(it) {
+  const g = groups.get(it.id); if (g) furnRoot.remove(g);
+  groups.delete(it.id);
+  items = items.filter((i) => i !== it);
+  if (selectedId === it.id) selectedId = null;
+  save(); renderList();
+}
+function duplicateItem(it) {
+  const { rects, ...rest } = it;
+  const copy = { ...rest, id: crypto.randomUUID?.() ?? String(Math.random()), example: false };
+  startPlacing(copy);
+}
+
+// ---- adding: link -> draft card -> place
+let draftData = null;
+function setStatus(t) { $("addStatus").textContent = t; }
+for (const [k, v] of Object.entries(SHAPES)) { const o = document.createElement("option"); o.value = k; o.textContent = v.label; $("dType").appendChild(o); }
+function syncChaiseRow() { $("dChaiseRow").hidden = $("dType").value !== "sofa"; }
+$("dType").onchange = syncChaiseRow;
+function setSrcChip(src, note) {
+  const [cls, text] = srcChip({ src });
+  $("dSrc").className = "chip " + cls; $("dSrc").textContent = text;
+  $("dNote").textContent = note ?? "";
+}
+function openDraft(d, mode) {
+  draftData = { ...d }; editingId = mode === "edit" ? d.id : null;
+  $("dFam").textContent = d.family;
+  $("dDesc").textContent = d.desc;
+  $("dArt").textContent = d.article ? "Article " + fmtArticle(d.article) : "";
+  $("dType").value = d.type; $("dW").value = d.w; $("dD").value = d.d; $("dH").value = d.h;
+  $("dCD").value = d.chaise || ""; $("dCS").value = d.chaiseSide ?? "right";
+  $("dColour").value = d.colour;
+  $("dLink").href = d.url; $("dLink").hidden = !d.url;
+  $("dPlace").textContent = mode === "edit" ? "Save changes" : "Place in model";
+  setSrcChip(d.src, d.note);
+  syncChaiseRow();
+  $("draft").hidden = false;
+  $("t-furnish").click();
+}
+function readDraft() {
+  const n = (id, lo, hi) => Math.min(hi, Math.max(lo, Math.round(Number($(id).value) || 0)));
+  const d = { ...draftData, type: $("dType").value, w: n("dW", 5, 600), d: n("dD", 5, 600), h: n("dH", 1, 300),
+    chaise: $("dType").value === "sofa" ? n("dCD", 0, 300) : 0, chaiseSide: $("dCS").value, colour: $("dColour").value };
+  if (d.w !== draftData.w || d.d !== draftData.d || d.h !== draftData.h || d.chaise !== (draftData.chaise || 0)) d.src = "manual";
+  return d;
+}
+let addSeq = 0;
+async function addFromLink(text) {
+  const p = parseIkeaUrl(text);
+  if (!p) { setStatus("That isn't an IKEA product link. Copy the address of a product page, like ikea.com/ch/en/p/…"); return; }
+  const seq = ++addSeq;
+  const [colour, colour2] = coloursFromSlug(p.slug);
+  const size = lookupSize(p);
+  const d = { id: crypto.randomUUID?.() ?? String(Math.random()), ...p, ...size, colour, colour2, chaiseSide: "right", rot: 0, x: 0, z: 0 };
+  if (size.src !== "typical") { setStatus(""); openDraft(d, "new"); return; }
+  const sample = await getSample();
+  if (!sample || sampleBlocked) {
+    setStatus("");
+    openDraft({ ...d, note: "This product isn't in the built-in list, so a typical size is filled in. Enter the real size from the IKEA page." }, "new");
+    return;
+  }
+  setStatus(`Asking Claude for the size of ${p.family}… This uses your Claude usage; you may be asked to allow it.`);
+  $("draft").hidden = true;
+  const r = await askClaudeForSize(p);
+  if (seq !== addSeq) return; // a newer link was added meanwhile
+  setStatus("");
+  if (!r || r.error) {
+    const why = r?.error === "rate_limited" ? "Claude is busy right now." : r?.error === "not_granted" ? "Claude wasn't allowed for this page." : "Claude couldn't give a size.";
+    openDraft({ ...d, note: `${why} A typical size is filled in; enter the real size from the IKEA page.` }, "new");
+    return;
+  }
+  openDraft({ ...d, type: r.type ?? d.type, w: r.w, d: r.d, h: r.h, chaise: r.chaise || d.chaise,
+    src: r.confident ? "claudeKnown" : "claude",
+    note: (r.confident ? "Claude recalled this product's size. " : "Claude estimated this size. ") + "Check it on the IKEA page before relying on a tight fit." + (r.note ? ` (${r.note})` : "") }, "new");
+}
+$("addForm").addEventListener("submit", (e) => { e.preventDefault(); addFromLink($("ikeaUrl").value); });
+$("tryExample").onclick = () => {
+  $("ikeaUrl").value = "https://www.ikea.com/ch/en/p/vimle-4-seat-sofa-with-chaise-longue-with-wide-armrests-lejde-grey-black-s89432816/";
+  addFromLink($("ikeaUrl").value);
+};
+$("dCancel").onclick = () => { $("draft").hidden = true; editingId = null; cancelPlacing(); };
+$("dPlace").onclick = () => {
+  const d = readDraft();
+  if (editingId) {
+    const it = items.find((i) => i.id === editingId);
+    if (it) { Object.assign(it, d, { id: it.id, x: it.x, z: it.z, rot: it.rot, example: false }); refreshItem(it); [it.x, it.z] = snapPosition(it, it.x, it.z); placeGroup(it); save(); select(it.id); }
+    $("draft").hidden = true; editingId = null; return;
+  }
+  $("draft").hidden = true;
+  startPlacing(d);
+};
+for (const id of ["dW", "dD", "dH", "dCD", "dCS", "dType", "dColour"]) $(id).addEventListener("change", () => { if (!editingId && draftData) $("dSrc").textContent = srcChip(readDraft())[1]; });
+
+// ---- placing & dragging in the viewport
+const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const hint = $("hint"), defaultHint = hint.textContent;
+function floorPoint(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const p = new THREE.Vector3();
+  return ray.ray.intersectPlane(floorPlane, p) ? p : null;
+}
+function startPlacing(d) {
+  cancelPlacing();
+  pending = { ...d };
+  const g = buildItem(pending);
+  pending.rects = g.userData.rects;
+  g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.7; } });
+  pending.group = g;
+  [pending.x, pending.z] = snapPosition(pending, controls.target.x, controls.target.z);
+  g.position.set(pending.x, 0, pending.z); g.rotation.y = pending.rot * Math.PI / 180;
+  scene.add(g);
+  selectedId = null;
+  hint.textContent = "Move the pointer to position · click to place · R rotates · Esc cancels";
+  updatePending();
+  renderList();
+}
+function updatePending() {
+  if (!pending) return;
+  pending.group.position.set(pending.x, 0, pending.z);
+  pending.group.rotation.y = pending.rot * Math.PI / 180;
+  tint(pending.group, pending.type !== "rug" && collisions(pending).size > 0);
+  updateSelectionVisuals();
+}
+function cancelPlacing() {
+  if (!pending) return;
+  scene.remove(pending.group); pending = null;
+  hint.textContent = defaultHint;
+  updateSelectionVisuals();
+}
+function commitPlacing() {
+  const { group, ...d } = pending;
+  scene.remove(group);
+  pending = null;
+  hint.textContent = defaultHint;
+  items.push(d); refreshItem(d); save();
+  select(d.id);
+}
+function pickItem(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(furnRoot.children, true).find((h) => h.object.isMesh && h.point.y <= cutPlane.constant + 1e-3);
+  return hit ? items.find((i) => i.id === hit.object.userData.itemId) : null;
+}
+let dragStart = null, dragOffset = null, downAt = null;
+view.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || $("measure").checked || e.target !== renderer.domElement) return;
+  downAt = [e.clientX, e.clientY];
+  if (pending) return; // let the camera orbit; a click (no drag) places
+  const it = pickItem(e);
+  if (!it) return;
+  e.stopPropagation(); // keep OrbitControls from starting a rotate
+  select(it.id);
+  const p = floorPoint(e);
+  if (!p) return;
+  dragging = true; dragStart = { x: it.x, z: it.z }; dragOffset = [it.x - p.x, it.z - p.z];
+  view.setPointerCapture(e.pointerId);
+  updateGridVisibility();
+}, true);
+view.addEventListener("pointermove", (e) => {
+  if (dragging) {
+    const it = items.find((i) => i.id === selectedId); const p = floorPoint(e);
+    if (!it || !p) return;
+    [it.x, it.z] = snapPosition(it, p.x + dragOffset[0], p.z + dragOffset[1]);
+    placeGroup(it);
+    tint(groups.get(it.id), it.type !== "rug" && collisions(it).size > 0);
+    updateSelectionVisuals();
+  } else if (pending && e.pointerType === "mouse" && !e.buttons) {
+    const p = floorPoint(e); if (!p) return;
+    [pending.x, pending.z] = snapPosition(pending, p.x, p.z);
+    updatePending();
+  }
+});
+view.addEventListener("pointerup", (e) => {
+  const click = downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 5;
+  downAt = null;
+  if (dragging) {
+    dragging = false;
+    try { view.releasePointerCapture(e.pointerId); } catch {}
+    save(); renderList(); return;
+  }
+  if (!click || $("measure").checked || e.target !== renderer.domElement) return;
+  if (pending) {
+    const p = floorPoint(e);
+    if (p) { [pending.x, pending.z] = snapPosition(pending, p.x, p.z); updatePending(); }
+    commitPlacing();
+    return;
+  }
+  if (selectedId && !pickItem(e)) { selectedId = null; renderList(); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest?.("input, select, textarea")) return;
+  const it = pending ?? items.find((i) => i.id === selectedId);
+  if (!it) return;
+  const step = gridStep || 0.05;
+  if (e.key === "r" || e.key === "R") { e.preventDefault(); if (pending) { pending.rot = (pending.rot + (e.shiftKey ? 270 : 90)) % 360; [pending.x, pending.z] = snapPosition(pending, pending.x, pending.z); updatePending(); } else rotateItem(it, e.shiftKey ? -90 : 90); }
+  else if (e.key === "Escape") { if (pending) cancelPlacing(); else { selectedId = null; renderList(); } }
+  else if (!pending && (e.key === "Delete" || e.key === "Backspace")) { e.preventDefault(); removeItem(it); }
+  else if (!pending && e.key.startsWith("Arrow")) {
+    e.preventDefault();
+    const [dx, dz] = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+    it.x += dx; it.z += dz; placeGroup(it); save(); renderList();
+  }
+});
+
+// ---- start: saved layout, or the example sofa
+(function initFurniture() {
+  const saved = load();
+  if (saved) items = saved;
+  else {
+    const p = parseIkeaUrl("https://www.ikea.com/ch/en/p/vimle-4-seat-sofa-with-chaise-longue-with-wide-armrests-lejde-grey-black-s89432816/");
+    const [colour, colour2] = coloursFromSlug(p.slug);
+    // against the living room's east wall, back to the wall, chaise towards the south glazing
+    items = [{ id: "example-vimle", ...p, ...lookupSize(p), colour, colour2, chaiseSide: "right", rot: 270, x: 14.05, z: 6.6, example: true }];
+  }
+  for (const it of items) refreshItem(it);
+  for (const it of items) { [it.x, it.z] = snapPosition(it, it.x, it.z); placeGroup(it); }
+  rebuildGrid();
+  renderList();
+})();
 
 // ---------- loop ----------
 function resize() {

@@ -5,11 +5,30 @@ built from the brochure floor plan in `source/floorplan_L08.02.pdf`.
 
 | File | What it is |
 | --- | --- |
-| `index.html` | Self-contained 3D viewer (model embedded). Open in a browser: orbit, plan view, eye-level view, adjustable section cut, click-to-measure. |
+| `index.html` | Self-contained 3D viewer and furniture planner (model embedded). Orbit, plan view, eye-level view, adjustable section cut, click-to-measure, IKEA furniture placement. |
 | `model/apartment.glb` | glTF binary for Blender, SketchUp, online viewers. Metres, Y up. |
 | `model/apartment.obj` + `material.mtl` | Same model as Wavefront OBJ. |
 | `model/apartment.json` | Rooms with plan area (BF) vs. measured model area. |
 | `build_model.py` | Regenerates everything from the PDF. |
+
+## Furniture planner
+
+Paste an IKEA product link (any country site, any colour variant) into **Furnish → Add IKEA furniture**.
+The page reads the product name, article number and colour from the link and builds a to-scale
+block model of it (sofa with optional chaise, armchair, bed, table, desk, chair, cabinet, open
+shelving, rug, lamp, or a plain block).
+
+- **Sizes.** The page cannot open ikea.com (its network access is blocked), so sizes come from, in order:
+  a built-in list of common products checked against IKEA's measurements (VIMLE, KIVIK, MALM, STRANDMON,
+  POÄNG, EKEDALEN, LACK, MICKE, HEMNES, BRIMNES, BILLY, KALLAX, PAX); sizes written in the link
+  (e.g. `160x200`); an estimate from Claude when the page runs inside claude.ai; or a typical size for
+  the shape. The source is shown on each item; every size can be edited.
+- **Grid.** Off / 5 / 10 / 25 cm. Footprint edges snap to grid lines aligned with the living room's
+  walls, and optionally flush against the nearest wall.
+- **Fit check.** Each item reports *Fits*, *Hits a wall*, *Hits a fixture* (kitchen, bath, WC, washer)
+  or *Overlaps furniture*, and turns red when it doesn't fit.
+- **Editing.** Click to select, drag to move, `R` rotate 90°, arrow keys nudge, `Del` remove.
+  The layout is saved in your browser.
 
 ## How it is to scale
 
