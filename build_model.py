@@ -322,6 +322,7 @@ FLOOR_FIXTURES = ("Kitchen counter", "Bathtub", "WC", "Washer/dryer", "Corridor 
 info["obstacles"] = {
     "walls": [rings(p.simplify(0.005)) for p in getattr(solid, "geoms", [solid])],
     "fixtures": [rings(mbox(*r)) for n, r, *_ in FIXTURES if n in FLOOR_FIXTURES],
+    "fixture_tops": [z1 for n, r, z0, z1, _ in FIXTURES if n in FLOOR_FIXTURES],  # metres, same order
 }
 (OUT / "apartment.json").write_text(json.dumps(info, indent=2))
 

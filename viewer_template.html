@@ -201,6 +201,17 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
           <label>Depth cm <input type="number" id="dD" min="5" max="600" step="1"></label>
           <label>Height cm <input type="number" id="dH" min="1" max="300" step="1"></label>
         </div>
+        <div class="row2">
+          <label class="field" style="flex:1">Placement
+            <select id="dMount">
+              <option value="floor">On the floor</option>
+              <option value="surface">On whatever is below it</option>
+              <option value="custom">At a set height</option>
+              <option value="ceiling">Hanging from the ceiling</option>
+            </select></label>
+          <label class="field" id="dElevWrap" style="width:110px"><span id="dElevLbl">Height cm</span>
+            <input type="number" id="dElev" min="0" max="250" step="1"></label>
+        </div>
         <div class="row2" id="dChaiseRow">
           <label class="field" style="flex:1">Chaise depth cm <input type="number" id="dCD" min="0" max="300" step="1"></label>
           <label class="field" style="flex:1">Chaise side
@@ -232,7 +243,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
         <h2 id="placedTitle">In the apartment</h2>
         <ul class="placed" id="placed" aria-label="Placed furniture"></ul>
         <p class="note">Click a piece in the model to select it, then drag to move it.
-          <kbd>R</kbd> rotates 90°, arrow keys nudge one grid step, <kbd>Del</kbd> removes, <kbd>Esc</kbd> deselects.</p>
+          <kbd>R</kbd> rotates 90°, arrow keys nudge one grid step, <kbd>PgUp</kbd>/<kbd>PgDn</kbd> raise or lower by 5 cm
+          (<kbd>Shift</kbd> for 1 cm), <kbd>Del</kbd> removes, <kbd>Esc</kbd> deselects. Things on a table move with it.</p>
       </div>
     </section>
 
@@ -573,12 +585,21 @@ const SHAPES = {
   shelving: { label: "Open shelving",    def: [80, 30, 180] },
   rug:      { label: "Rug",              def: [170, 240, 1] },
   lamp:     { label: "Floor lamp",       def: [40, 40, 150] },
+  tablelamp:{ label: "Table lamp",       def: [25, 25, 45] },
+  pendant:  { label: "Pendant lamp",     def: [40, 40, 30] },
+  plant:    { label: "Plant",            def: [30, 30, 60] },
+  deco:     { label: "Decoration",       def: [20, 20, 30] },
   box:      { label: "Plain block",      def: [100, 60, 75] },
 };
 // slug keyword -> shape, first match wins (order matters: "sofa-bed" is a sofa)
 const SHAPE_RULES = [
   [/sofa|couch|loveseat|daybed|chaise/, "sofa"], [/armchair|wing-chair|easy-chair|rocking-chair/, "armchair"],
   [/bed-frame|(^|-)bed(-|$)|bunk-bed|loft-bed/, "bed"], [/desk|workstation/, "desk"],
+  [/pendant|ceiling-lamp|ceiling-light|ceiling-spotlight/, "pendant"],
+  [/table-lamp|desk-lamp|work-lamp|bedside-lamp/, "tablelamp"],
+  [/floor-lamp|floor-uplighter|floor-reading-lamp/, "lamp"],
+  [/plant-pot|potted-plant|artificial-plant|(^|-)plant(-|$)/, "plant"],
+  [/vase|bowl|candle|decoration|ornament|sculpture|figurine|photo-frame|(^|-)frame(-|$)|tray|clock|basket|lantern/, "deco"],
   [/bookcase|shelving|shelf-unit|shelves/, "shelving"],
   [/wardrobe|cabinet|dresser|chest-of|drawer|sideboard|tv-bench|tv-unit|storage|bedside-table|nightstand/, "storage"],
   [/table/, "table"], [/chair|stool|bench/, "chair"], [/rug|carpet/, "rug"], [/lamp|light/, "lamp"],
@@ -587,6 +608,7 @@ const SIZE_HINTS = [ // typical sizes when a slug names a sub-type
   [/coffee-table/, [90, 55, 45]], [/side-table|bedside/, [50, 40, 55]], [/tv-bench|tv-unit/, [160, 40, 50]],
   [/wardrobe/, [100, 58, 201]], [/dining-table/, [140, 80, 75]], [/2-seat/, [160, 90, 80]], [/3-seat/, [220, 95, 83]],
   [/4-seat/, [290, 98, 83]], [/stool/, [40, 40, 45]],
+  [/candle/, [10, 10, 15]], [/vase/, [15, 15, 30]], [/bowl/, [30, 30, 10]], [/frame/, [25, 4, 30]],
 ];
 const COLOURS = [
   ["dark-grey", "#4a4d50"], ["light-grey", "#bfc2c4"], ["medium-grey", "#8a8d90"], ["anthracite", "#3c3e41"],
@@ -811,24 +833,121 @@ function buildLamp(g, it, { main, dark }) {
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   return [[-w / 2, -w / 2, w / 2, w / 2]];
 }
+function mesh(g, geo, mat, y) { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = true; m.receiveShadow = true; g.add(m); return m; }
+function buildTableLamp(g, it, { main, dark }) {
+  const w = it.w / 100, h = it.h / 100;
+  mesh(g, new THREE.CylinderGeometry(w * 0.3, w * 0.34, 0.03, 24), dark ?? main, 0.015);
+  mesh(g, new THREE.CylinderGeometry(0.008, 0.008, h * 0.62, 8), dark ?? main, h * 0.31);
+  const sh = mesh(g, new THREE.CylinderGeometry(w * 0.32, w / 2, h * 0.4, 28, 1, true), shadeMat(), h * 0.8);
+  sh.castShadow = false;
+  return [[-w / 2, -w / 2, w / 2, w / 2]];
+}
+function buildPendant(g, it, { main, dark }) {
+  // local y = 0 is the bottom of the shade; the cord runs up to the ceiling
+  const w = it.w / 100, h = it.h / 100;
+  const cord = Math.max(0, CEIL - elevM(it) - h);
+  const dome = new THREE.SphereGeometry(w / 2, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+  dome.scale(1, h / (w / 2), 1);
+  const sh = mesh(g, dome, main, 0); sh.material = main.clone(); sh.material.side = THREE.DoubleSide;
+  mesh(g, new THREE.SphereGeometry(Math.min(0.04, w * 0.12), 12, 8), new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xffd98a, emissiveIntensity: 1.2 }), h * 0.15).castShadow = false;
+  if (cord > 0.005) mesh(g, new THREE.CylinderGeometry(0.004, 0.004, cord, 6), dark ?? main, h + cord / 2).castShadow = false;
+  mesh(g, new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16), dark ?? main, h + cord - 0.01);
+  return [[-w / 2, -w / 2, w / 2, w / 2]];
+}
+function buildPlant(g, it, { main }) {
+  const w = it.w / 100, h = it.h / 100, potH = Math.min(h * 0.35, w * 0.9);
+  mesh(g, new THREE.CylinderGeometry(w * 0.42, w * 0.32, potH, 24), main, potH / 2);
+  const leaf = new THREE.MeshStandardMaterial({ color: 0x4f7a45, roughness: 0.9, flatShading: true, clippingPlanes: [cutPlane] });
+  const r = Math.max(w * 0.5, 0.06), crown = h - potH;
+  for (const [dx, dy, dz, k] of [[0, 0.55, 0, 1], [0.35, 0.3, 0.1, 0.75], [-0.3, 0.35, -0.15, 0.7], [0.05, 0.85, 0.2, 0.6]]) {
+    const b = mesh(g, new THREE.IcosahedronGeometry(r * k, 0), leaf, potH + crown * dy);
+    b.position.x = dx * r; b.position.z = dz * r; b.scale.y = Math.max(0.6, crown / (r * 2));
+  }
+  return [[-w / 2, -w / 2, w / 2, w / 2]];
+}
+function buildDeco(g, it, { main }) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100;
+  if (/frame/.test(it.slug ?? "") || d < w * 0.3) { blk(g, main, -w / 2, w / 2, 0, h, -d / 2, d / 2); return [[-w / 2, -d / 2, w / 2, d / 2]]; }
+  // a turned profile: bowl when it's low and wide, vase otherwise
+  const pts = h < w * 0.6
+    ? [[0, 0], [w * 0.3, 0], [w * 0.45, h * 0.5], [w * 0.5, h], [w * 0.46, h]]
+    : [[0, 0], [w * 0.32, 0], [w * 0.5, h * 0.35], [w * 0.36, h * 0.8], [w * 0.28, h], [w * 0.24, h]];
+  const m = mesh(g, new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), 32), main, 0);
+  m.material = main.clone(); m.material.side = THREE.DoubleSide;
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+function shadeMat() { return new THREE.MeshStandardMaterial({ color: 0xf6efe1, emissive: 0x6b5a3a, roughness: 1, side: THREE.DoubleSide, clippingPlanes: [cutPlane] }); }
 function buildItem(it) {
   const g = new THREE.Group();
   const main = makeMat(it.colour);
   const mats = { main, dark: it.colour2 ? makeMat(it.colour2) : makeMat(shade(it.colour, -0.25).getStyle()),
     cush: makeMat(shade(it.colour, 0.05).getStyle()) };
   const fn = { sofa: buildSofa, armchair: buildSofa, bed: buildBed, table: buildTable, desk: buildTable, chair: buildChair,
-    storage: buildStorage, shelving: buildStorage, rug: buildRug, lamp: buildLamp }[it.type];
+    storage: buildStorage, shelving: buildStorage, rug: buildRug, lamp: buildLamp, tablelamp: buildTableLamp,
+    pendant: buildPendant, plant: buildPlant, deco: buildDeco }[it.type];
   let rects;
   if (fn) rects = fn(g, it, mats);
   else { blk(g, main, -it.w / 200, it.w / 200, 0, it.h / 100, -it.d / 200, it.d / 200); rects = [[-it.w / 200, -it.d / 200, it.w / 200, it.d / 200]]; }
   g.userData.rects = rects;
   g.userData.itemId = it.id;
+  // hanging lamps stay visible above the section cut
+  if (it.type === "pendant") g.traverse((o) => { if (o.material) o.material.clippingPlanes = []; });
   g.traverse((o) => { o.userData.itemId = it.id; });
   return g;
 }
 
 // ---- footprint geometry, obstacles, collisions
-const OBST = [...INFO.obstacles.walls.map((p) => ({ rings: p, wall: true })), ...INFO.obstacles.fixtures.map((p) => ({ rings: p, wall: false }))];
+const OBST = [...INFO.obstacles.walls.map((p) => ({ rings: p, wall: true, top: 99 })),
+  ...INFO.obstacles.fixtures.map((p, i) => ({ rings: p, wall: false, top: INFO.obstacles.fixture_tops?.[i] ?? 0.9 }))];
+
+// ---- heights. mount: "floor" | "surface" (rests on whatever is below) | "custom" (elev cm) | "ceiling" (drop cm below ceiling)
+const CEIL = INFO.wall_height_m;
+const MOUNT_DEFAULT = { deco: "surface", plant: "surface", tablelamp: "surface", pendant: "ceiling" };
+const defaultMount = (type) => MOUNT_DEFAULT[type] ?? "floor";
+function elevM(it) {
+  if (it.mount === "ceiling") return Math.max(0, CEIL - (it.drop ?? 60) / 100 - it.h / 100);
+  if (it.mount === "floor" || !it.mount) return 0;
+  return Math.max(0, (it.elev ?? 0) / 100);
+}
+const vRange = (it) => [elevM(it), elevM(it) + it.h / 100];
+// height of the surface an item offers to things placed on it
+function surfaceTop(o) {
+  const h = o.h / 100, y = elevM(o);
+  switch (o.type) {
+    case "sofa": case "armchair": return y + Math.min(0.48, h * 0.6);
+    case "bed": return y + Math.min(0.38, h * 0.4) + 0.08;
+    case "chair": return y + Math.min(0.46, h * 0.56);
+    case "pendant": case "lamp": case "tablelamp": case "plant": return null;
+    default: return y + h;
+  }
+}
+// what is under (x, z): the highest furniture top or fixture top there, else the floor
+function supportAt(it, x, z) {
+  let best = { top: 0, id: null };
+  for (const o of items) {
+    if (o.id === it.id || o.mount === "ceiling") continue;
+    const t = surfaceTop(o); if (t === null) continue;
+    if (worldRects(o).some((r) => inWorldRect(x, z, r)) && t > best.top) best = { top: t, id: o.id };
+  }
+  for (const o of OBST) {
+    if (o.wall || x < o.bb[0] || x > o.bb[2] || z < o.bb[1] || z > o.bb[3]) continue;
+    if (inRing(x, z, o.rings[0]) && o.top > best.top) best = { top: o.top, id: null };
+  }
+  return best;
+}
+function settle(it, x = it.x, z = it.z) {
+  if (it.mount !== "surface") return false;
+  const e = Math.round(supportAt(it, x, z).top * 1000) / 10; // cm, 1 mm precision
+  if (e === it.elev) return false;
+  it.elev = e; return true;
+}
+function heightText(it) {
+  if (it.mount === "ceiling") return `hangs ${Math.round(it.drop ?? 60)} cm below ceiling`;
+  const e = Math.round(elevM(it) * 100);
+  if (it.mount === "surface") return e > 0 ? `on top, ${e} cm up` : "on the floor";
+  if (it.mount === "custom") return `${e} cm up`;
+  return "";
+}
 for (const o of OBST) {
   const xs = o.rings[0].map((v) => v[0]), zs = o.rings[0].map((v) => v[1]);
   o.bb = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
@@ -841,8 +960,9 @@ function inRing(x, z, r) {
   }
   return c;
 }
-function hitsObstacle(x, z) {
+function hitsObstacle(x, z, y0 = 0) {
   for (const o of OBST) {
+    if (y0 >= o.top - 0.01) continue; // resting on (or hanging above) a fixture
     if (x < o.bb[0] || x > o.bb[2] || z < o.bb[1] || z > o.bb[3]) continue;
     if (inRing(x, z, o.rings[0]) && !o.rings.slice(1).some((h) => inRing(x, z, h))) return o.wall ? "wall" : "fixture";
   }
@@ -870,16 +990,18 @@ function aabb(rects) {
 function collisions(it, x = it.x, z = it.z, rot = it.rot) {
   const out = new Set();
   const rects = worldRects(it, x, z, rot);
-  const others = items.filter((o) => o.id !== it.id && o.type !== "rug").map((o) => ({ o, rs: worldRects(o), bb: aabb(worldRects(o)) }));
+  const [y0, y1] = vRange(it);
+  const others = items.filter((o) => o.id !== it.id && o.type !== "rug").map((o) => ({ o, rs: worldRects(o), bb: aabb(worldRects(o)), y0: vRange(o)[0], y1: vRange(o)[1] }));
   const step = 0.04, pad = 0.01;
   for (const r of rects) {
     const [x0, z0, x1, z1] = r.local;
     for (let lx = x0 + pad; lx <= x1 - pad + 1e-6; lx += Math.min(step, Math.max(0.005, x1 - x0 - 2 * pad))) {
       for (let lz = z0 + pad; lz <= z1 - pad + 1e-6; lz += Math.min(step, Math.max(0.005, z1 - z0 - 2 * pad))) {
         const px = x + lx * r.c + lz * r.s, pz = z - lx * r.s + lz * r.c;
-        const h = hitsObstacle(px, pz);
+        const h = hitsObstacle(px, pz, y0);
         if (h) out.add(h);
         for (const q of others) {
+          if (y0 >= q.y1 - 0.01 || y1 <= q.y0 + 0.01) continue; // above or below it
           if (px < q.bb[0] || px > q.bb[2] || pz < q.bb[1] || pz > q.bb[3]) continue;
           if (q.rs.some((rr) => inWorldRect(px, pz, rr))) out.add("item");
         }
@@ -1006,13 +1128,13 @@ function refreshItem(it) {
   if (old) { furnRoot.remove(old); old.traverse((o) => { o.geometry?.dispose?.(); }); }
   const g = buildItem(it);
   it.rects = g.userData.rects;
-  g.position.set(it.x, 0, it.z);
+  g.position.set(it.x, elevM(it), it.z);
   g.rotation.y = it.rot * Math.PI / 180;
   furnRoot.add(g); groups.set(it.id, g);
 }
 function placeGroup(it) {
   const g = groups.get(it.id); if (!g) return;
-  g.position.set(it.x, 0, it.z); g.rotation.y = it.rot * Math.PI / 180;
+  g.position.set(it.x, elevM(it), it.z); g.rotation.y = it.rot * Math.PI / 180;
 }
 function tint(g, bad) {
   g.traverse((o) => { if (o.isMesh && o.material.emissive) { o.material.emissive.set(bad ? 0x8f1d1d : 0x000000); o.material.emissiveIntensity = bad ? 0.55 : 1; } });
@@ -1051,7 +1173,7 @@ function renderList() {
     li.querySelector(".sw").style.background = it.colour;
     li.querySelector(".nm").textContent = `${it.family} · ${it.desc}`;
     li.querySelector(".nm").title = `${it.family} ${it.desc}`;
-    li.querySelector(".n").textContent = sizeText(it);
+    li.querySelector(".n").textContent = sizeText(it) + (heightText(it) ? ` · ${heightText(it)}` : "");
     li.onclick = (e) => {
       const a = e.target.closest("button")?.dataset.a;
       if (a === "rot") rotateItem(it, 90);
@@ -1073,12 +1195,13 @@ function updateSelectionVisuals() {
   dimLabel.visible = !!it;
   if (it) {
     for (const r of worldRects(it)) {
-      const pts = [...r.pts, r.pts[0]].map(([x, z]) => new THREE.Vector3(x, 0.012, z));
+      const y = elevM(it) + 0.012;
+      const pts = [...r.pts, r.pts[0]].map(([x, z]) => new THREE.Vector3(x, y, z));
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: accent(), depthTest: false }));
       line.renderOrder = 11; selOutline.add(line);
     }
-    dimLabel.element.textContent = sizeText(it);
-    dimLabel.position.set(it.x, it.h / 100 + 0.15, it.z);
+    dimLabel.element.textContent = sizeText(it) + (heightText(it) ? ` · ${heightText(it)}` : "");
+    dimLabel.position.set(it.x, elevM(it) + it.h / 100 + 0.15, it.z);
   }
   updateGridVisibility();
 }
@@ -1088,17 +1211,43 @@ function select(id) {
   for (const li of $("placed").querySelectorAll("li")) li.setAttribute("aria-selected", "false");
   renderList();
 }
+// things resting on `it` (a vase on a table) travel and turn with it
+function ridersOf(it) {
+  return items.filter((o) => o.mount === "surface" && o.id !== it.id && supportAt(o, o.x, o.z).id === it.id)
+    .map((o) => ({ o, dx: o.x - it.x, dz: o.z - it.z }));
+}
+function moveRiders(it, riders, deg = 0) {
+  const t = deg * Math.PI / 180, c = Math.cos(t), sn = Math.sin(t);
+  for (const r of riders) {
+    if (deg) { [r.dx, r.dz] = [r.dx * c + r.dz * sn, -r.dx * sn + r.dz * c]; r.o.rot = ((r.o.rot + deg) % 360 + 360) % 360; }
+    r.o.x = it.x + r.dx; r.o.z = it.z + r.dz; placeGroup(r.o);
+  }
+}
+// re-seat everything that rests on something, after a change underneath it
+function resettleAll() {
+  for (let pass = 0; pass < 2; pass++) for (const o of items) if (settle(o)) { placeGroup(o); persist(o); }
+}
 function rotateItem(it, deg) {
+  const riders = ridersOf(it);
   it.rot = ((it.rot + deg) % 360 + 360) % 360;
   [it.x, it.z] = snapPosition(it, it.x, it.z);
-  placeGroup(it); persist(it); renderList();
+  moveRiders(it, riders, deg);
+  settle(it); placeGroup(it); persist(it);
+  for (const r of riders) persist(r.o);
+  resettleAll(); renderList();
+}
+function setHeight(it, deltaCm) {
+  if (it.mount === "ceiling") it.drop = Math.max(0, Math.min(CEIL * 100 - it.h, (it.drop ?? 60) - deltaCm));
+  else { it.elev = Math.max(0, Math.min(CEIL * 100 - it.h, Math.round(elevM(it) * 100) + deltaCm)); it.mount = "custom"; }
+  if (it.type === "pendant") refreshItem(it); else placeGroup(it);
+  persist(it); resettleAll(); renderList();
 }
 function removeItem(it) {
   const g = groups.get(it.id); if (g) furnRoot.remove(g);
   groups.delete(it.id);
   items = items.filter((i) => i !== it);
   if (selectedId === it.id) selectedId = null;
-  persistRemove(it.id); renderList();
+  persistRemove(it.id); resettleAll(); renderList();
 }
 function duplicateItem(it) {
   const { rects, ...rest } = it;
@@ -1111,7 +1260,19 @@ let draftData = null;
 function setStatus(t) { $("addStatus").textContent = t; }
 for (const [k, v] of Object.entries(SHAPES)) { const o = document.createElement("option"); o.value = k; o.textContent = v.label; $("dType").appendChild(o); }
 function syncChaiseRow() { $("dChaiseRow").hidden = $("dType").value !== "sofa"; }
-$("dType").onchange = syncChaiseRow;
+function syncMountRow() {
+  const m = $("dMount").value;
+  $("dElevWrap").hidden = m === "floor" || m === "surface";
+  $("dElevLbl").textContent = m === "ceiling" ? "Cable cm" : "Height cm";
+  $("dElev").title = m === "ceiling" ? "From the ceiling to the top of the lamp" : "From the floor to the bottom of the piece";
+}
+$("dType").onchange = () => { syncChaiseRow(); $("dMount").value = defaultMount($("dType").value); syncMountRow(); setMountInput(); };
+$("dMount").onchange = () => { syncMountRow(); setMountInput(); };
+function setMountInput() {
+  const m = $("dMount").value;
+  if (m === "ceiling") $("dElev").value = draftData?.drop ?? 60;
+  else if (m === "custom") $("dElev").value = draftData?.elev ?? 75;
+}
 function setSrcChip(src, note) {
   const [cls, text] = srcChip({ src });
   $("dSrc").className = "chip " + cls; $("dSrc").textContent = text;
@@ -1129,13 +1290,19 @@ function openDraft(d, mode) {
   $("dPlace").textContent = mode === "edit" ? "Save changes" : "Place in model";
   setSrcChip(d.src, d.note);
   syncChaiseRow();
+  $("dMount").value = d.mount ?? defaultMount(d.type);
+  syncMountRow(); setMountInput();
+  if (d.mount === "custom") $("dElev").value = Math.round(d.elev ?? 0);
   $("draft").hidden = false;
   $("t-furnish").click();
 }
 function readDraft() {
   const n = (id, lo, hi) => Math.min(hi, Math.max(lo, Math.round(Number($(id).value) || 0)));
   const d = { ...draftData, type: $("dType").value, w: n("dW", 5, 600), d: n("dD", 5, 600), h: n("dH", 1, 300),
-    chaise: $("dType").value === "sofa" ? n("dCD", 0, 300) : 0, chaiseSide: $("dCS").value, colour: $("dColour").value };
+    chaise: $("dType").value === "sofa" ? n("dCD", 0, 300) : 0, chaiseSide: $("dCS").value, colour: $("dColour").value,
+    mount: $("dMount").value };
+  if (d.mount === "custom") d.elev = n("dElev", 0, 250);
+  if (d.mount === "ceiling") d.drop = n("dElev", 0, 250);
   if (d.w !== draftData.w || d.d !== draftData.d || d.h !== draftData.h || d.chaise !== (draftData.chaise || 0)) d.src = "manual";
   return d;
 }
@@ -1178,7 +1345,7 @@ $("dPlace").onclick = () => {
   const d = readDraft();
   if (editingId) {
     const it = items.find((i) => i.id === editingId);
-    if (it) { Object.assign(it, d, { id: it.id, x: it.x, z: it.z, rot: it.rot, example: false }); refreshItem(it); [it.x, it.z] = snapPosition(it, it.x, it.z); placeGroup(it); persist(it); select(it.id); }
+    if (it) { Object.assign(it, d, { id: it.id, x: it.x, z: it.z, rot: it.rot, example: false }); settle(it); refreshItem(it); [it.x, it.z] = snapPosition(it, it.x, it.z); placeGroup(it); persist(it); resettleAll(); select(it.id); }
     $("draft").hidden = true; editingId = null; return;
   }
   $("draft").hidden = true;
@@ -1198,7 +1365,7 @@ function floorPoint(e) {
 }
 function startPlacing(d) {
   cancelPlacing();
-  pending = { ...d };
+  pending = { ...d, mount: d.mount ?? defaultMount(d.type) };
   const g = buildItem(pending);
   pending.rects = g.userData.rects;
   g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.7; } });
@@ -1213,7 +1380,8 @@ function startPlacing(d) {
 }
 function updatePending() {
   if (!pending) return;
-  pending.group.position.set(pending.x, 0, pending.z);
+  settle(pending);
+  pending.group.position.set(pending.x, elevM(pending), pending.z);
   pending.group.rotation.y = pending.rot * Math.PI / 180;
   tint(pending.group, pending.type !== "rug" && collisions(pending).size > 0);
   updateSelectionVisuals();
@@ -1236,10 +1404,11 @@ function pickItem(e) {
   const r = renderer.domElement.getBoundingClientRect();
   ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObjects(furnRoot.children, true).find((h) => h.object.isMesh && h.point.y <= cutPlane.constant + 1e-3);
+  const hit = ray.intersectObjects(furnRoot.children, true)
+    .find((h) => h.object.isMesh && (h.point.y <= cutPlane.constant + 1e-3 || !h.object.material.clippingPlanes?.length));
   return hit ? items.find((i) => i.id === hit.object.userData.itemId) : null;
 }
-let dragStart = null, dragOffset = null, downAt = null;
+let dragStart = null, dragOffset = null, downAt = null, dragRiders = [];
 view.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || $("measure").checked || e.target !== renderer.domElement) return;
   downAt = [e.clientX, e.clientY];
@@ -1254,6 +1423,7 @@ view.addEventListener("pointerdown", (e) => {
   const p = floorPoint(e);
   if (!p) return;
   dragging = true; dragStart = { x: it.x, z: it.z }; dragOffset = [it.x - p.x, it.z - p.z];
+  dragRiders = ridersOf(it);
   view.setPointerCapture(e.pointerId);
   updateGridVisibility();
 }, true);
@@ -1262,10 +1432,12 @@ view.addEventListener("pointermove", (e) => {
     const it = items.find((i) => i.id === selectedId); const p = floorPoint(e);
     if (!it || !p) return;
     [it.x, it.z] = snapPosition(it, p.x + dragOffset[0], p.z + dragOffset[1]);
+    settle(it);
     placeGroup(it);
+    moveRiders(it, dragRiders);
     tint(groups.get(it.id), it.type !== "rug" && collisions(it).size > 0);
     updateSelectionVisuals();
-    presence({ drag: { id: it.id, x: +it.x.toFixed(3), z: +it.z.toFixed(3), rot: it.rot } });
+    presence({ drag: { id: it.id, x: +it.x.toFixed(3), y: +elevM(it).toFixed(3), z: +it.z.toFixed(3), rot: it.rot } });
   }
   { const p = floorPoint(e); presence({ cursor: p ? [+p.x.toFixed(2), +p.z.toFixed(2)] : null }); }
   if (dragging) {
@@ -1283,6 +1455,9 @@ view.addEventListener("pointerup", (e) => {
     try { view.releasePointerCapture(e.pointerId); } catch {}
     const moved = items.find((i) => i.id === selectedId);
     if (moved) persist(moved).then(() => presence({ drag: null }));
+    for (const r of dragRiders) persist(r.o);
+    dragRiders = [];
+    resettleAll();
     renderList(); return;
   }
   if (!click || $("measure").checked || e.target !== renderer.domElement) return;
@@ -1301,6 +1476,11 @@ document.addEventListener("keydown", (e) => {
   if (!canWrite && e.key !== "Escape") return;
   const step = gridStep || 0.05;
   if (e.key === "r" || e.key === "R") { e.preventDefault(); if (pending) { pending.rot = (pending.rot + (e.shiftKey ? 270 : 90)) % 360; [pending.x, pending.z] = snapPosition(pending, pending.x, pending.z); updatePending(); } else rotateItem(it, e.shiftKey ? -90 : 90); }
+  else if (!pending && (e.key === "PageUp" || e.key === "PageDown" || e.key === "+" || e.key === "-")) {
+    e.preventDefault();
+    const step = e.shiftKey ? 1 : 5;
+    setHeight(it, (e.key === "PageUp" || e.key === "+") ? step : -step);
+  }
   else if (e.key === "Escape") { if (pending) cancelPlacing(); else { selectedId = null; presence({ sel: null }); renderList(); } }
   else if (!pending && (e.key === "Delete" || e.key === "Backspace")) { e.preventDefault(); removeItem(it); }
   else if (!pending && e.key.startsWith("Arrow")) {
@@ -1313,9 +1493,9 @@ document.addEventListener("keydown", (e) => {
 // ---- sync: one shared layout in the artifact's database, people live in the room.
 // Without a Claude viewer (a local file) everything stays in this browser.
 const ARTIFACT_URL = "https://claude.ai/artifact/AU4Q1joHJ5591a2iKdLMtk";
-const DOC_FIELDS = ["id", "url", "slug", "article", "family", "desc", "type", "w", "d", "h", "chaise", "chaiseSide",
+const DOC_FIELDS = ["id", "url", "slug", "article", "family", "desc", "type", "w", "d", "h", "chaise", "chaiseSide", "mount", "elev", "drop",
   "colour", "colour2", "x", "z", "rot", "src", "note", "example", "addedBy", "createdAt", "by", "updatedAt"];
-const GEOM_FIELDS = ["type", "w", "d", "h", "chaise", "chaiseSide", "colour", "colour2", "slug"];
+const GEOM_FIELDS = ["type", "w", "d", "h", "chaise", "chaiseSide", "colour", "colour2", "slug", "mount", "drop"];
 let db = null, room = null, userNs = null, myId = null, canWrite = true, shared = false;
 let layouts = [], highlightLayout = null;
 const nameCache = new Map(); // user id -> display name (never stored)
@@ -1390,7 +1570,7 @@ function applyFurniture(snap) {
     const next = { ...ch.doc.data(), id };
     const cur = items.find((i) => i.id === id);
     if (!cur) { items.push(next); refreshItem(next); continue; }
-    const geom = GEOM_FIELDS.some((k) => cur[k] !== next[k]);
+    const geom = GEOM_FIELDS.some((k) => cur[k] !== next[k]) || (cur.type === "pendant" && cur.elev !== next.elev);
     Object.assign(cur, next);
     if (geom) refreshItem(cur); else placeGroup(cur);
   }
@@ -1518,7 +1698,7 @@ function applyRemoteDrags() {
   for (const it of items) {
     const r = remoteDrag.get(it.id);
     const g = groups.get(it.id); if (!g) continue;
-    if (r && !(dragging && it.id === selectedId)) { g.position.set(r.x, 0, r.z); g.rotation.y = r.rot * Math.PI / 180; }
+    if (r && !(dragging && it.id === selectedId)) { g.position.set(r.x, r.y ?? elevM(it), r.z); g.rotation.y = r.rot * Math.PI / 180; }
     else placeGroup(it);
   }
 }
@@ -1562,7 +1742,7 @@ async function renderPeers() {
     v.dot.visible = v.tag.visible = !!c && Number.isFinite(c[0]) && Number.isFinite(c[1]);
     if (v.dot.visible) { v.dot.position.set(c[0], 0.02, c[1]); v.tag.position.set(c[0], 0.02, c[1]); }
     const dr = p.presence?.drag;
-    if (dr && typeof dr.id === "string" && Number.isFinite(dr.x) && Number.isFinite(dr.z)) remoteDrag.set(dr.id, { x: dr.x, z: dr.z, rot: Number(dr.rot) || 0 });
+    if (dr && typeof dr.id === "string" && Number.isFinite(dr.x) && Number.isFinite(dr.z)) remoteDrag.set(dr.id, { x: dr.x, y: Number.isFinite(dr.y) ? dr.y : null, z: dr.z, rot: Number(dr.rot) || 0 });
     // their selection outline, in their colour
     for (const ch of [...v.outline.children]) { v.outline.remove(ch); ch.geometry.dispose(); }
     const selId = typeof p.presence?.sel === "string" ? p.presence.sel : null;

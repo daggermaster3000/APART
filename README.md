@@ -16,7 +16,7 @@ built from the brochure floor plan in `source/floorplan_L08.02.pdf`.
 Paste an IKEA product link (any country site, any colour variant) into **Furnish → Add IKEA furniture**.
 The page reads the product name, article number and colour from the link and builds a to-scale
 block model of it (sofa with optional chaise, armchair, bed, table, desk, chair, cabinet, open
-shelving, rug, lamp, or a plain block).
+shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, or a plain block).
 
 - **Sizes.** The page cannot open ikea.com (its network access is blocked), so sizes come from, in order:
   a built-in list of common products checked against IKEA's measurements (VIMLE, KIVIK, MALM, STRANDMON,
@@ -27,7 +27,15 @@ shelving, rug, lamp, or a plain block).
   walls, and optionally flush against the nearest wall.
 - **Fit check.** Each item reports *Fits*, *Hits a wall*, *Hits a fixture* (kitchen, bath, WC, washer)
   or *Overlaps furniture*, and turns red when it doesn't fit.
-- **Editing.** Click to select, drag to move, `R` rotate 90°, arrow keys nudge, `Del` remove.
+- **Height.** Each piece has a placement: *On the floor*, *On whatever is below it* (rests on the
+  table, sideboard, bed, sofa seat or kitchen counter under it, or the floor if there's nothing),
+  *At a set height* (cm above the floor), or *Hanging from the ceiling* (cable length from the
+  2.50 m ceiling). Decorations, plants and table lamps default to resting on what's below; pendant
+  lamps hang. Things resting on a piece move and turn with it, and drop to what's beneath when it is
+  removed. Fit checks only compare pieces that overlap in height, so a vase on a table or a lamp above
+  it doesn't count as a clash.
+- **Editing.** Click to select, drag to move, `R` rotate 90°, arrow keys nudge, `PgUp`/`PgDn` raise or
+  lower by 5 cm (`Shift` for 1 cm), `Del` remove.
 
 ## Working together
 
