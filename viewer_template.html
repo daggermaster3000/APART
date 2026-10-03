@@ -104,6 +104,22 @@ ul.placed .meta .n { font-family: var(--f-mono); font-size: 11.5px; }
 .icons button { background: none; border: 1px solid transparent; color: var(--fg); font: inherit; font-size: 13px; width: 28px; height: 26px; cursor: pointer; }
 .icons button:hover { border-color: var(--line); }
 .empty { color: var(--muted); font-size: 12.5px; margin: 0; }
+.here { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.here .faces { display: flex; }
+.here img { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--panel); margin-left: -6px; background: var(--line); }
+.here img:first-child { margin-left: 0; }
+.sync { margin: 0; font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.sync::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+.sync[data-s="live"]::before { background: var(--ok); }
+.sync[data-s="saving"]::before { background: var(--warn); }
+.sync[data-s="ro"]::before { background: var(--bad); }
+.by { font-size: 11.5px; color: var(--muted); }
+ul.placed li.hl { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.confirm { display: flex; gap: 6px; align-items: center; font-size: 12px; }
+.confirm button { font: inherit; font-size: 12px; padding: 3px 8px; border: 1px solid var(--line); background: none; color: var(--fg); cursor: pointer; }
+.confirm button.yes { background: var(--fg); color: var(--panel); border-color: var(--fg); }
+.ro .icons button[data-a] { display: none; }
+.lbl.peer { color: #fff; font-weight: 500; font-size: 11px; padding: 1px 6px; }
 kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); padding: 0 4px; }
 .lbl.fdim { background: var(--fg); color: var(--panel); font-family: var(--f-mono); font-weight: 400; }
 @media (max-width: 760px) {
@@ -130,6 +146,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
       <span class="tag">L08.02</span>
       <h1>Lemgrubenstrasse 8, Erdgeschoss</h1>
       <p class="sub" id="summary"></p>
+      <div class="here" id="here" hidden aria-live="polite"></div>
     </header>
     <section class="controls" aria-label="View controls">
       <div class="seg" role="group" aria-label="Camera">
@@ -150,12 +167,14 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
     </section>
     <div class="tabs" role="tablist" aria-label="Panels">
       <button role="tab" id="t-furnish" aria-controls="p-furnish" aria-selected="true">Furnish</button>
+      <button role="tab" id="t-layouts" aria-controls="p-layouts" aria-selected="false">Share &amp; save</button>
       <button role="tab" id="t-rooms" aria-controls="p-rooms" aria-selected="false">Rooms</button>
       <button role="tab" id="t-about" aria-controls="p-about" aria-selected="false">About</button>
     </div>
 
     <section class="panel" id="p-furnish" role="tabpanel" aria-labelledby="t-furnish">
-      <div class="stack">
+      <p class="sync" id="syncLine" role="status"></p>
+      <div class="stack" id="addBlock">
         <h2>Add IKEA furniture</h2>
         <form class="add" id="addForm" novalidate>
           <input type="url" id="ikeaUrl" placeholder="Paste an ikea.com product link" aria-label="IKEA product link" autocomplete="off">
@@ -214,6 +233,33 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
         <ul class="placed" id="placed" aria-label="Placed furniture"></ul>
         <p class="note">Click a piece in the model to select it, then drag to move it.
           <kbd>R</kbd> rotates 90°, arrow keys nudge one grid step, <kbd>Del</kbd> removes, <kbd>Esc</kbd> deselects.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-layouts" role="tabpanel" aria-labelledby="t-layouts" hidden>
+      <div class="stack">
+        <h2>Share</h2>
+        <p class="note">Everyone you share this page with sees the same furniture and moves it live, with each person's
+          pointer shown in the model. Invite people with <strong>Share</strong> at the top right of the page:
+          Contributors and Editors can move furniture, Viewers can only look.</p>
+        <div class="row2">
+          <input type="text" id="shareUrl" readonly aria-label="Link to this page" style="flex:1">
+          <button class="btn ghost" type="button" id="copyShare">Copy link</button>
+        </div>
+        <p class="sync" id="syncState" role="status"></p>
+      </div>
+      <div class="stack" id="saveBlock">
+        <h2>Save this layout</h2>
+        <p class="note">Saving keeps a copy of the current arrangement, so you can try ideas and come back to this one.</p>
+        <form class="add" id="saveForm" novalidate>
+          <input type="text" id="layoutName" placeholder="Name, e.g. Sofa facing the garden" maxlength="60" aria-label="Layout name">
+          <button class="btn" type="submit">Save</button>
+        </form>
+        <p class="status" id="saveStatus" role="status"></p>
+      </div>
+      <div class="stack">
+        <h2 id="layoutsTitle">Saved layouts</h2>
+        <ul class="placed" id="layouts" aria-label="Saved layouts"></ul>
       </div>
     </section>
 
@@ -482,9 +528,10 @@ $("compass").style.overflow = "visible";
 $("compass").style.color = "var(--fg)";
 
 // ---------- panel tabs ----------
-for (const t of ["furnish", "rooms", "about"]) {
+const TABS = ["furnish", "layouts", "rooms", "about"];
+for (const t of TABS) {
   $("t-" + t).onclick = () => {
-    for (const u of ["furnish", "rooms", "about"]) {
+    for (const u of TABS) {
       $("t-" + u).setAttribute("aria-selected", String(u === t));
       $("p-" + u).hidden = u !== t;
     }
@@ -927,13 +974,13 @@ const groups = new Map(); // id -> THREE.Group
 const dimLabel = (() => { const el = document.createElement("div"); el.className = "lbl fdim"; const o = new CSS2DObject(el); o.visible = false; scene.add(o); return o; })();
 const selOutline = new THREE.Group(); scene.add(selOutline);
 
-function save() {
-  try { localStorage.setItem(STORE, JSON.stringify({ items: items.map(({ rects, ...rest }) => rest) })); } catch {}
+function saveLocal() {
+  try { localStorage.setItem(STORE, JSON.stringify({ items: items.map(toDoc) })); } catch {}
 }
 function savePrefs() {
   try { localStorage.setItem(STORE + "-prefs", JSON.stringify({ grid: gridStep, walls: $("snapWalls").checked, show: $("showGrid").checked })); } catch {}
 }
-function load() {
+function loadPrefs() {
   try {
     const p = JSON.parse(localStorage.getItem(STORE + "-prefs") || "null");
     if (p) {
@@ -941,6 +988,8 @@ function load() {
       for (const o of $("gridSeg").querySelectorAll("button")) o.setAttribute("aria-pressed", String(Number(o.dataset.g) === gridStep));
     }
   } catch {}
+}
+function loadLocal() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || "null");
     if (s && Array.isArray(s.items)) return s.items;
@@ -985,9 +1034,10 @@ function renderList() {
   $("placedTitle").textContent = `In the apartment · ${items.length}`;
   if (!items.length) {
     const li = document.createElement("li"); li.className = "empty"; li.style.cursor = "default";
-    li.textContent = "Nothing placed yet. Paste an IKEA product link above to add your first piece.";
+    li.textContent = canWrite ? "Nothing placed yet. Paste an IKEA product link above to add your first piece." : "Nothing placed yet.";
     ul.appendChild(li);
   }
+  items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
   for (const it of items) {
     const st = statusOf(it);
     tint(groups.get(it.id), st.cls === "bad");
@@ -996,7 +1046,8 @@ function renderList() {
     li.tabIndex = 0;
     li.innerHTML = `<span class="sw"></span><span class="nm"></span>
       <span class="icons"><button title="Rotate 90°" aria-label="Rotate 90 degrees" data-a="rot">⟳</button><button title="Edit size" aria-label="Edit size" data-a="edit">✎</button><button title="Duplicate" aria-label="Duplicate" data-a="dup">⧉</button><button title="Remove" aria-label="Remove" data-a="del">✕</button></span>
-      <span class="meta"><span class="n"></span><span class="chip ${st.cls}">${st.text}</span>${it.example ? '<span class="chip info">Example</span>' : ""}</span>`;
+      <span class="meta"><span class="n"></span><span class="chip ${st.cls}">${st.text}</span>${it.example ? '<span class="chip info">Example</span>' : ""}<span class="by"></span></span>`;
+    if (shared && it.by) { const b = li.querySelector(".by"); b.dataset.uid = it.by; b.dataset.prefix = "moved by "; b.textContent = nameCache.has(it.by) ? "moved by " + nameCache.get(it.by) : ""; }
     li.querySelector(".sw").style.background = it.colour;
     li.querySelector(".nm").textContent = `${it.family} · ${it.desc}`;
     li.querySelector(".nm").title = `${it.family} ${it.desc}`;
@@ -1007,11 +1058,13 @@ function renderList() {
       else if (a === "del") removeItem(it);
       else if (a === "dup") duplicateItem(it);
       else if (a === "edit") openDraft(it, "edit");
+      else if (a) return;
       else { select(it.id); focusOn(it.x, it.z); }
     };
     li.onkeydown = (e) => { if (e.target === li && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); select(it.id); focusOn(it.x, it.z); } };
     ul.appendChild(li);
   }
+  fillNames(ul);
   updateSelectionVisuals();
 }
 function updateSelectionVisuals() {
@@ -1031,20 +1084,21 @@ function updateSelectionVisuals() {
 }
 function select(id) {
   selectedId = id;
+  presence({ sel: id });
   for (const li of $("placed").querySelectorAll("li")) li.setAttribute("aria-selected", "false");
   renderList();
 }
 function rotateItem(it, deg) {
   it.rot = ((it.rot + deg) % 360 + 360) % 360;
   [it.x, it.z] = snapPosition(it, it.x, it.z);
-  placeGroup(it); save(); renderList();
+  placeGroup(it); persist(it); renderList();
 }
 function removeItem(it) {
   const g = groups.get(it.id); if (g) furnRoot.remove(g);
   groups.delete(it.id);
   items = items.filter((i) => i !== it);
   if (selectedId === it.id) selectedId = null;
-  save(); renderList();
+  persistRemove(it.id); renderList();
 }
 function duplicateItem(it) {
   const { rects, ...rest } = it;
@@ -1124,7 +1178,7 @@ $("dPlace").onclick = () => {
   const d = readDraft();
   if (editingId) {
     const it = items.find((i) => i.id === editingId);
-    if (it) { Object.assign(it, d, { id: it.id, x: it.x, z: it.z, rot: it.rot, example: false }); refreshItem(it); [it.x, it.z] = snapPosition(it, it.x, it.z); placeGroup(it); save(); select(it.id); }
+    if (it) { Object.assign(it, d, { id: it.id, x: it.x, z: it.z, rot: it.rot, example: false }); refreshItem(it); [it.x, it.z] = snapPosition(it, it.x, it.z); placeGroup(it); persist(it); select(it.id); }
     $("draft").hidden = true; editingId = null; return;
   }
   $("draft").hidden = true;
@@ -1175,7 +1229,7 @@ function commitPlacing() {
   scene.remove(group);
   pending = null;
   hint.textContent = defaultHint;
-  items.push(d); refreshItem(d); save();
+  d.addedBy = myId; d.createdAt = Date.now(); items.push(d); refreshItem(d); persist(d);
   select(d.id);
 }
 function pickItem(e) {
@@ -1194,6 +1248,9 @@ view.addEventListener("pointerdown", (e) => {
   if (!it) return;
   e.stopPropagation(); // keep OrbitControls from starting a rotate
   select(it.id);
+  if (!canWrite) return; // read-only viewers can select, not move
+  const mover = movingPeer(it.id);
+  if (mover) { flash(`${mover} is moving this right now.`); return; }
   const p = floorPoint(e);
   if (!p) return;
   dragging = true; dragStart = { x: it.x, z: it.z }; dragOffset = [it.x - p.x, it.z - p.z];
@@ -1208,6 +1265,10 @@ view.addEventListener("pointermove", (e) => {
     placeGroup(it);
     tint(groups.get(it.id), it.type !== "rug" && collisions(it).size > 0);
     updateSelectionVisuals();
+    presence({ drag: { id: it.id, x: +it.x.toFixed(3), z: +it.z.toFixed(3), rot: it.rot } });
+  }
+  { const p = floorPoint(e); presence({ cursor: p ? [+p.x.toFixed(2), +p.z.toFixed(2)] : null }); }
+  if (dragging) {
   } else if (pending && e.pointerType === "mouse" && !e.buttons) {
     const p = floorPoint(e); if (!p) return;
     [pending.x, pending.z] = snapPosition(pending, p.x, p.z);
@@ -1220,7 +1281,9 @@ view.addEventListener("pointerup", (e) => {
   if (dragging) {
     dragging = false;
     try { view.releasePointerCapture(e.pointerId); } catch {}
-    save(); renderList(); return;
+    const moved = items.find((i) => i.id === selectedId);
+    if (moved) persist(moved).then(() => presence({ drag: null }));
+    renderList(); return;
   }
   if (!click || $("measure").checked || e.target !== renderer.domElement) return;
   if (pending) {
@@ -1229,37 +1292,325 @@ view.addEventListener("pointerup", (e) => {
     commitPlacing();
     return;
   }
-  if (selectedId && !pickItem(e)) { selectedId = null; renderList(); }
+  if (selectedId && !pickItem(e)) { selectedId = null; presence({ sel: null }); renderList(); }
 });
 document.addEventListener("keydown", (e) => {
   if (e.target.closest?.("input, select, textarea")) return;
   const it = pending ?? items.find((i) => i.id === selectedId);
   if (!it) return;
+  if (!canWrite && e.key !== "Escape") return;
   const step = gridStep || 0.05;
   if (e.key === "r" || e.key === "R") { e.preventDefault(); if (pending) { pending.rot = (pending.rot + (e.shiftKey ? 270 : 90)) % 360; [pending.x, pending.z] = snapPosition(pending, pending.x, pending.z); updatePending(); } else rotateItem(it, e.shiftKey ? -90 : 90); }
-  else if (e.key === "Escape") { if (pending) cancelPlacing(); else { selectedId = null; renderList(); } }
+  else if (e.key === "Escape") { if (pending) cancelPlacing(); else { selectedId = null; presence({ sel: null }); renderList(); } }
   else if (!pending && (e.key === "Delete" || e.key === "Backspace")) { e.preventDefault(); removeItem(it); }
   else if (!pending && e.key.startsWith("Arrow")) {
     e.preventDefault();
     const [dx, dz] = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-    it.x += dx; it.z += dz; placeGroup(it); save(); renderList();
+    it.x += dx; it.z += dz; placeGroup(it); persist(it); renderList();
   }
 });
 
-// ---- start: saved layout, or the example sofa
-(function initFurniture() {
-  const saved = load();
-  if (saved) items = saved;
-  else {
-    const p = parseIkeaUrl("https://www.ikea.com/ch/en/p/vimle-4-seat-sofa-with-chaise-longue-with-wide-armrests-lejde-grey-black-s89432816/");
-    const [colour, colour2] = coloursFromSlug(p.slug);
-    // against the living room's east wall, back to the wall, chaise towards the south glazing
-    items = [{ id: "example-vimle", ...p, ...lookupSize(p), colour, colour2, chaiseSide: "right", rot: 270, x: 14.05, z: 6.6, example: true }];
+// ---- sync: one shared layout in the artifact's database, people live in the room.
+// Without a Claude viewer (a local file) everything stays in this browser.
+const ARTIFACT_URL = "https://claude.ai/artifact/AU4Q1joHJ5591a2iKdLMtk";
+const DOC_FIELDS = ["id", "url", "slug", "article", "family", "desc", "type", "w", "d", "h", "chaise", "chaiseSide",
+  "colour", "colour2", "x", "z", "rot", "src", "note", "example", "addedBy", "createdAt", "by", "updatedAt"];
+const GEOM_FIELDS = ["type", "w", "d", "h", "chaise", "chaiseSide", "colour", "colour2", "slug"];
+let db = null, room = null, userNs = null, myId = null, canWrite = true, shared = false;
+let layouts = [], highlightLayout = null;
+const nameCache = new Map(); // user id -> display name (never stored)
+
+function toDoc(it) { const o = {}; for (const k of DOC_FIELDS) if (it[k] !== undefined) o[k] = it[k]; return o; }
+const exampleItem = () => {
+  const p = parseIkeaUrl("https://www.ikea.com/ch/en/p/vimle-4-seat-sofa-with-chaise-longue-with-wide-armrests-lejde-grey-black-s89432816/");
+  const [colour, colour2] = coloursFromSlug(p.slug);
+  // against the living room's east wall, back to the wall, chaise towards the south glazing
+  return { id: "example-vimle", ...p, ...lookupSize(p), colour, colour2, chaiseSide: "right", rot: 270, x: 14.05, z: 6.6, example: true, createdAt: 0 };
+};
+
+function setSync(state) {
+  const text = !shared ? "Saved in this browser only. Open the page on claude.ai to share it."
+    : !canWrite ? "View only. Ask the owner for Contributor access to move furniture."
+    : state === "saving" ? "Saving…" : state === "connecting" ? "Connecting…" : "Live. Changes save for everyone.";
+  const s = !shared ? "local" : !canWrite ? "ro" : state;
+  for (const id of ["syncLine", "syncState"]) { $(id).textContent = text; $(id).dataset.s = s; }
+}
+let flashTimer = 0;
+function flash(msg) {
+  hint.textContent = msg; clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { hint.textContent = pending ? "Move the pointer to position · click to place · R rotates · Esc cancels" : defaultHint; }, 3500);
+}
+function setReadOnly(ro) {
+  canWrite = !ro;
+  document.body.classList.toggle("ro", ro);
+  $("addBlock").hidden = ro; $("saveBlock").hidden = ro;
+  if (ro) { $("draft").hidden = true; cancelPlacing(); }
+  setSync("live"); renderLayouts();
+}
+
+// writes: one at a time per document, only on a real change
+const writeChains = new Map();
+let inFlight = 0;
+function queueWrite(id, fn) {
+  inFlight++; setSync("saving");
+  const next = (writeChains.get(id) ?? Promise.resolve()).then(fn)
+    .catch(onWriteError)
+    .finally(() => { if (--inFlight === 0) setSync("live"); });
+  writeChains.set(id, next);
+  return next;
+}
+function onWriteError(e) {
+  const code = e?.code;
+  if (code === "invalid_argument" || code === "revoked" || code === "not_granted") { setReadOnly(true); flash("Your change wasn't saved: this page is view-only for you."); }
+  else if (code === "quota_exceeded") flash("The shared store is full. Remove some pieces or saved layouts, then try again.");
+  else flash("Couldn't save that change. Try it again.");
+}
+function persist(it) {
+  it.by = myId; it.updatedAt = Date.now();
+  if (!shared) { saveLocal(); return Promise.resolve(); }
+  const body = toDoc(it);
+  return queueWrite(it.id, () => db.collection("furniture").doc(it.id).set(body));
+}
+function persistRemove(id) {
+  if (!shared) { saveLocal(); return Promise.resolve(); }
+  return queueWrite(id, () => db.collection("furniture").doc(id).delete());
+}
+
+function dropLocal(id) {
+  const g = groups.get(id); if (g) furnRoot.remove(g);
+  groups.delete(id);
+  items = items.filter((i) => i.id !== id);
+  if (selectedId === id) selectedId = null;
+}
+function applyFurniture(snap) {
+  for (const ch of snap.docChanges()) {
+    const id = ch.doc.id;
+    if (ch.type === "removed") { dropLocal(id); continue; }
+    if (dragging && id === selectedId) continue; // my own drag wins until I drop
+    const next = { ...ch.doc.data(), id };
+    const cur = items.find((i) => i.id === id);
+    if (!cur) { items.push(next); refreshItem(next); continue; }
+    const geom = GEOM_FIELDS.some((k) => cur[k] !== next[k]);
+    Object.assign(cur, next);
+    if (geom) refreshItem(cur); else placeGroup(cur);
   }
-  for (const it of items) refreshItem(it);
-  for (const it of items) { [it.x, it.z] = snapPosition(it, it.x, it.z); placeGroup(it); }
-  rebuildGrid();
+  applyRemoteDrags();
   renderList();
+}
+
+// ---- saved layouts
+const LOCAL_LAYOUTS = STORE + "-layouts";
+function layoutId() { return "L" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+async function saveLayout(name) {
+  const L = { name, items: items.map(toDoc), count: items.length, savedBy: myId, savedAt: Date.now() };
+  const id = layoutId();
+  if (!shared) {
+    layouts = [{ id, ...L }, ...layouts];
+    try { localStorage.setItem(LOCAL_LAYOUTS, JSON.stringify(layouts)); } catch {}
+    renderLayouts(); return;
+  }
+  await queueWrite("layout-" + id, () => db.collection("layouts").doc(id).set(L));
+}
+async function deleteLayout(L) {
+  if (!shared) { layouts = layouts.filter((x) => x.id !== L.id); try { localStorage.setItem(LOCAL_LAYOUTS, JSON.stringify(layouts)); } catch {} renderLayouts(); return; }
+  await queueWrite("layout-" + L.id, () => db.collection("layouts").doc(L.id).delete());
+}
+async function loadLayout(L) {
+  cancelPlacing(); selectedId = null;
+  const keep = new Set(L.items.map((d) => d.id));
+  const gone = items.filter((i) => !keep.has(i.id)).map((i) => i.id);
+  for (const id of gone) dropLocal(id);
+  for (const d of L.items) {
+    const cur = items.find((i) => i.id === d.id);
+    if (cur) { Object.assign(cur, d); refreshItem(cur); } else { const it = { ...d }; items.push(it); refreshItem(it); }
+  }
+  renderList();
+  if (!shared) { saveLocal(); return; }
+  for (const id of gone) persistRemove(id);
+  for (const d of L.items) persist(items.find((i) => i.id === d.id));
+}
+let confirming = null; // {id, action}
+function renderLayouts() {
+  const ul = $("layouts"); if (!ul) return;
+  ul.innerHTML = "";
+  $("layoutsTitle").textContent = `Saved layouts · ${layouts.length}`;
+  if (!layouts.length) {
+    const li = document.createElement("li"); li.className = "empty";
+    li.textContent = canWrite ? "No saved layouts yet. Name the current arrangement above and save it." : "No saved layouts yet.";
+    ul.appendChild(li);
+  }
+  for (const L of layouts) {
+    const li = document.createElement("li");
+    li.classList.toggle("hl", L.id === highlightLayout);
+    li.style.cursor = "default";
+    li.innerHTML = `<span class="sw" style="border:0"></span><span class="nm"></span>
+      <span class="icons"><button data-l="copy" title="Copy link to this layout" aria-label="Copy link to this layout">🔗</button></span>
+      <span class="meta"><span class="n"></span><span class="by"></span></span>`;
+    li.querySelector(".nm").textContent = L.name || "Untitled layout";
+    const when = new Date(L.savedAt || 0);
+    li.querySelector(".n").textContent = `${L.count ?? L.items?.length ?? 0} pieces · ${when.toLocaleDateString(undefined, { day: "numeric", month: "short" })} ${when.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+    if (L.savedBy) li.querySelector(".by").dataset.uid = L.savedBy;
+    const meta = li.querySelector(".meta");
+    if (canWrite) {
+      const c = document.createElement("span"); c.className = "confirm";
+      if (confirming?.id === L.id) {
+        c.innerHTML = `<span></span><button class="yes" data-l="yes">Yes</button><button data-l="no">Keep</button>`;
+        c.firstChild.textContent = confirming.action === "load" ? "Replace the current furniture for everyone?" : "Delete this saved layout?";
+      } else c.innerHTML = `<button data-l="load">Load</button><button data-l="del">Delete</button>`;
+      meta.appendChild(c);
+    }
+    li.onclick = async (e) => {
+      const a = e.target.closest("button")?.dataset.l; if (!a) return;
+      if (a === "copy") return copyText(`${ARTIFACT_URL}#layout-${L.id}`, `Link to “${L.name}” copied.`);
+      if (a === "load" || a === "del") { confirming = { id: L.id, action: a }; return renderLayouts(); }
+      if (a === "no") { confirming = null; return renderLayouts(); }
+      if (a === "yes") {
+        const act = confirming?.action; confirming = null;
+        if (act === "load") { await loadLayout(L); $("saveStatus").textContent = `Loaded “${L.name}”.`; }
+        else if (act === "del") await deleteLayout(L);
+        renderLayouts();
+      }
+    };
+    ul.appendChild(li);
+  }
+  fillNames(ul);
+}
+$("saveForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("layoutName").value.trim();
+  if (!name) { $("saveStatus").textContent = "Give the layout a name first."; $("layoutName").focus(); return; }
+  if (!items.length) { $("saveStatus").textContent = "There's no furniture to save yet."; return; }
+  await saveLayout(name.slice(0, 60));
+  $("layoutName").value = ""; $("saveStatus").textContent = `Saved “${name}”.`;
+});
+
+// ---- sharing
+$("shareUrl").value = ARTIFACT_URL;
+async function copyText(text, done) {
+  try { await navigator.clipboard.writeText(text); flash(done); $("saveStatus").textContent = done; }
+  catch { $("shareUrl").value = text; $("shareUrl").select(); $("saveStatus").textContent = "Copy the selected link above."; }
+}
+$("copyShare").onclick = () => copyText(ARTIFACT_URL, "Link copied. People also need access from the Share menu.");
+
+// ---- people: names, presence, live cursors and drags
+async function fillNames(rootEl) {
+  const els = [...rootEl.querySelectorAll("[data-uid]")];
+  if (!els.length || !userNs) return;
+  const ids = [...new Set(els.map((e) => e.dataset.uid))];
+  const ps = await userNs.profiles(ids);
+  for (const el of els) {
+    const p = ps[el.dataset.uid];
+    const who = p?.isMe ? "you" : (p?.name || "someone");
+    nameCache.set(el.dataset.uid, who);
+    el.textContent = (el.dataset.prefix ?? "by ") + who;
+  }
+}
+function presence(patch) { if (room) room.presence(patch).catch(() => {}); }
+const peerViews = new Map(); // peer label -> {dot, tag, outline}
+const remoteDrag = new Map(); // item id -> {x, z, rot}
+let peerProfiles = {};
+function movingPeer(itemId) {
+  if (!room) return null;
+  const p = room.peers().find((q) => !q.isMe && q.presence?.drag?.id === itemId);
+  return p ? (peerProfiles[p.by]?.name || "Someone") : null;
+}
+function applyRemoteDrags() {
+  for (const it of items) {
+    const r = remoteDrag.get(it.id);
+    const g = groups.get(it.id); if (!g) continue;
+    if (r && !(dragging && it.id === selectedId)) { g.position.set(r.x, 0, r.z); g.rotation.y = r.rot * Math.PI / 180; }
+    else placeGroup(it);
+  }
+}
+const dotGeo2 = new THREE.RingGeometry(0.09, 0.14, 24).rotateX(-Math.PI / 2);
+async function renderPeers() {
+  const all = room.peers();
+  const others = all.filter((p) => !p.isMe && p.kind === "viewer");
+  const ids = [...new Set(all.map((p) => p.by).filter(Boolean))];
+  if (userNs && ids.length) peerProfiles = await userNs.profiles(ids);
+  // header strip
+  const here = $("here");
+  here.hidden = others.length === 0;
+  if (others.length) {
+    here.innerHTML = '<span class="faces"></span><span></span>';
+    for (const p of others.slice(0, 5)) {
+      const img = document.createElement("img"); const pr = peerProfiles[p.by];
+      img.src = pr?.avatarUrl ?? ""; img.alt = pr?.name || "Someone"; img.title = pr?.name || "Someone";
+      img.style.borderColor = pr?.color ?? "var(--panel)";
+      here.firstChild.appendChild(img);
+    }
+    here.lastChild.textContent = `${others.length} other ${others.length === 1 ? "person" : "people"} here now`;
+  }
+  // cursors, selections, drags
+  remoteDrag.clear();
+  const seen = new Set();
+  for (const p of others) {
+    seen.add(p.peer);
+    const pr = peerProfiles[p.by]; const color = pr?.color ?? "#7a7f85"; const name = pr?.name || "Someone";
+    let v = peerViews.get(p.peer);
+    if (!v) {
+      const dot = new THREE.Mesh(dotGeo2, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true }));
+      dot.renderOrder = 12;
+      const el = document.createElement("div"); el.className = "lbl peer";
+      const tag = new CSS2DObject(el); tag.center.set(-0.1, 1.2);
+      const outline = new THREE.Group();
+      scene.add(dot, tag, outline);
+      v = { dot, tag, outline }; peerViews.set(p.peer, v);
+    }
+    v.dot.material.color.set(color); v.tag.element.style.background = color; v.tag.element.textContent = name;
+    const c = Array.isArray(p.presence?.cursor) ? p.presence.cursor : null;
+    v.dot.visible = v.tag.visible = !!c && Number.isFinite(c[0]) && Number.isFinite(c[1]);
+    if (v.dot.visible) { v.dot.position.set(c[0], 0.02, c[1]); v.tag.position.set(c[0], 0.02, c[1]); }
+    const dr = p.presence?.drag;
+    if (dr && typeof dr.id === "string" && Number.isFinite(dr.x) && Number.isFinite(dr.z)) remoteDrag.set(dr.id, { x: dr.x, z: dr.z, rot: Number(dr.rot) || 0 });
+    // their selection outline, in their colour
+    for (const ch of [...v.outline.children]) { v.outline.remove(ch); ch.geometry.dispose(); }
+    const selId = typeof p.presence?.sel === "string" ? p.presence.sel : null;
+    const it = selId && items.find((i) => i.id === selId);
+    if (it) {
+      const r = remoteDrag.get(it.id);
+      for (const wr of worldRects(it, r?.x ?? it.x, r?.z ?? it.z, r?.rot ?? it.rot)) {
+        const pts = [...wr.pts, wr.pts[0]].map(([x, z]) => new THREE.Vector3(x, 0.016, z));
+        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineDashedMaterial({ color, dashSize: 0.12, gapSize: 0.06, depthTest: false }));
+        line.computeLineDistances(); line.renderOrder = 11; v.outline.add(line);
+      }
+    }
+  }
+  for (const [peer, v] of peerViews) if (!seen.has(peer)) { scene.remove(v.dot, v.tag, v.outline); v.tag.element.remove(); peerViews.delete(peer); }
+  applyRemoteDrags();
+}
+view.addEventListener("pointerleave", () => presence({ cursor: null }));
+
+// ---- start
+(async function initFurniture() {
+  loadPrefs(); rebuildGrid();
+  setSync("connecting");
+  const c = window.claude;
+  if (c?.use) [db, userNs, room] = await Promise.all(["db", "user", "room"].map((n) => c.use(n).catch(() => null)));
+  if (db) {
+    shared = true;
+    myId = userNs ? await userNs.id() : null;
+    const cw = userNs ? await userNs.can("data.write") : null;
+    setReadOnly(cw === false); // null = not told: keep controls, a refused write decides
+    db.collection("furniture").onSnapshot(applyFurniture, (e) => { if (e.code === "revoked") setReadOnly(true); });
+    db.collection("layouts").orderBy("savedAt", "desc").limit(100).onSnapshot((snap) => {
+      layouts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderLayouts();
+    });
+  } else {
+    items = loadLocal() ?? [exampleItem()];
+    for (const it of items) refreshItem(it);
+    try { layouts = JSON.parse(localStorage.getItem(LOCAL_LAYOUTS) || "[]"); } catch { layouts = []; }
+    setSync("live"); renderLayouts();
+  }
+  if (room) {
+    room.onPeers(() => { renderPeers(); }, () => {});
+    presence({ sel: selectedId, cursor: null, drag: null });
+  }
+  // a shared link to a saved layout: #layout-<id>
+  const m = location.hash.match(/^#layout-([A-Za-z0-9]+)$/);
+  if (m) { highlightLayout = m[1]; $("t-layouts").click(); }
+  renderList(); renderLayouts();
 })();
 
 // ---------- loop ----------

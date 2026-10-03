@@ -28,7 +28,20 @@ shelving, rug, lamp, or a plain block).
 - **Fit check.** Each item reports *Fits*, *Hits a wall*, *Hits a fixture* (kitchen, bath, WC, washer)
   or *Overlaps furniture*, and turns red when it doesn't fit.
 - **Editing.** Click to select, drag to move, `R` rotate 90°, arrow keys nudge, `Del` remove.
-  The layout is saved in your browser.
+
+## Working together
+
+Opened on claude.ai, the planner is shared: everyone with access sees one layout and changes it live.
+
+- **Sharing.** Invite people with the page's **Share** menu. Contributors and Editors can add and move
+  furniture; Viewers can look around (the page switches to view-only for them).
+- **Live.** Each change saves on its own (one document per piece in the artifact's database). Other
+  people's pointers, selections and in-progress drags show in the model in their colour; a piece someone
+  is dragging can't be grabbed until they drop it. Each piece shows who moved it last.
+- **Saved layouts.** *Share & save → Save this layout* stores a named copy of the arrangement. Anyone with
+  edit access can load one (it replaces the current furniture for everyone, after a confirmation) or
+  delete it. The link icon copies a link straight to a saved layout (`…#layout-<id>`).
+- Opened as a local file, the same page works on its own and saves in the browser.
 
 ## How it is to scale
 
