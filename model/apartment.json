@@ -1,0 +1,102 @@
+{
+  "name": "Lemgrubenstrasse 8 \u00b7 Erdgeschoss \u00b7 L08.02",
+  "summary": "3\u00bd-Zimmerwohnung \u00b7 94 m\u00b2 Nettowohnfl\u00e4che \u00b7 76.3 m\u00b2 Sitzplatz",
+  "units": "metres",
+  "up": "+y",
+  "north": "-x (page left)",
+  "scale_pt_per_m": 15.566,
+  "wall_height_m": 2.5,
+  "door_head_m": 2.1,
+  "sill_m": 0.9,
+  "extent_m": {
+    "x": 15.26,
+    "z": 13.05
+  },
+  "rooms": [
+    {
+      "name": "Zimmer 1",
+      "plan_area_m2": 16.0,
+      "model_area_m2": 16.04,
+      "label": [
+        6.018244892714891,
+        2.71424900424001
+      ]
+    },
+    {
+      "name": "Zimmer 2",
+      "plan_area_m2": 12.4,
+      "model_area_m2": 12.1,
+      "label": [
+        9.487344211743542,
+        2.71424900424001
+      ]
+    },
+    {
+      "name": "Korridor",
+      "plan_area_m2": 10.1,
+      "model_area_m2": 10.79,
+      "label": [
+        7.4315816523191565,
+        5.348194783502505
+      ]
+    },
+    {
+      "name": "Bad",
+      "plan_area_m2": 4.3,
+      "model_area_m2": 4.47,
+      "label": [
+        5.632789412822818,
+        7.339714762944879
+      ]
+    },
+    {
+      "name": "Reduit",
+      "plan_area_m2": 3.3,
+      "model_area_m2": 3.34,
+      "label": [
+        9.872799691635615,
+        7.660927662854939
+      ]
+    },
+    {
+      "name": "Wohnen / Essen",
+      "plan_area_m2": 47.9,
+      "model_area_m2": 48.17,
+      "label": [
+        12.956443530772194,
+        9.138507002441216
+      ]
+    }
+  ],
+  "terraces": [
+    {
+      "name": "Sitzplatz N",
+      "plan_area_m2": 61.3,
+      "model_area_m2": 70.74,
+      "label": [
+        9.630605165103429,
+        -3.122189387125786
+      ]
+    },
+    {
+      "name": "Sitzplatz S",
+      "plan_area_m2": 15.0,
+      "model_area_m2": 14.08,
+      "label": [
+        13.123474238725425,
+        14.844854169343439
+      ]
+    }
+  ],
+  "shared": [
+    {
+      "name": "Treppenhaus",
+      "plan_area_m2": 18.4,
+      "label": [
+        1.6497494539380704,
+        5.412437363484517
+      ]
+    }
+  ],
+  "apartment_model_area_m2": 94.91
+}
