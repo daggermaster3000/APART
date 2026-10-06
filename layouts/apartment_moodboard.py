@@ -76,6 +76,8 @@ add("lounge-lamp", "Floor lamp", "arc, black", "lamp", 40, 40, 160, 11.45, 12.45
     colour2=CHAR, slug="floor-lamp", style={"material": "metal", "shade": "dome"})
 add("lounge-plant", "Plant", "monstera", "plant", 50, 50, 120, 14.45, 12.4, 0, SAGE, "Lounge",
     style={"material": "ceramic", "foliage": "leafy"}, slug="plant")
+add("guitar", "Guitar", "acoustic, on a stand", "guitar", 40, 35, 105, 14.6, 9.5, 270, "#d8b27a", "Lounge",
+    colour2="#6b3f22", slug="acoustic-guitar", style={"material": "wood"})
 add("lounge-candles", "Candles", "on the coffee table", "deco", 12, 12, 15, 13.1, 10.95, 0, CREAM, "Lounge",
     mount="surface", elev=45, style={"material": "ceramic", "profile": "cylinder"}, slug="candle")
 

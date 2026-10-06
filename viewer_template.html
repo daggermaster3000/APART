@@ -680,11 +680,12 @@ const SHAPES = {
   raisedbed:{ label: "Raised bed",       def: [200, 80, 70] },
   brewkettle: { label: "Brew kettle on burner", def: [55, 55, 110] },
   fermenter:{ label: "Fermenter",        def: [35, 35, 60] },
+  guitar:   { label: "Guitar on stand",  def: [40, 35, 105] },
   box:      { label: "Plain block",      def: [100, 60, 75] },
 };
 // slug keyword -> shape, first match wins (order matters: "sofa-bed" is a sofa)
 const SHAPE_RULES = [
-  [/aquarium|aquarien/, "aquarium"], [/raised-bed|hochbeet|planter-box/, "raisedbed"],
+  [/guitar|gitarre|guitare|ukulele/, "guitar"], [/aquarium|aquarien/, "aquarium"], [/raised-bed|hochbeet|planter-box/, "raisedbed"],
   [/brew-kettle|braukessel|sudkessel|brewzilla|grainfather/, "brewkettle"], [/fermenter|gärbehälter|garbehalter|gaerbottich/, "fermenter"],
   [/day-?bed|tagesbett|lit-de-repos/, "daybed"], [/pegboard|lochplatte/, "pegboard"],
   [/curtain|vorhang|gardin|rideau/, "curtain"], [/office-chair|swivel-chair|desk-chair|burostuhl|gaming-chair/, "officechair"],
@@ -838,7 +839,7 @@ const STYLE_FIELDS = {
   rug: ["material"], lamp: ["material", "shade"], tablelamp: ["material", "shade"], pendant: ["material", "shade"],
   plant: ["material", "foliage"], deco: ["material", "profile"], box: ["material"],
   daybed: ["material"], pegboard: ["material"], wallshelf: ["material"], curtain: ["material"], officechair: ["material"], monitor: ["material"],
-  aquarium: ["material"], raisedbed: ["material"], brewkettle: ["material"], fermenter: ["material"],
+  aquarium: ["material"], raisedbed: ["material"], brewkettle: ["material"], fermenter: ["material"], guitar: ["material"],
 };
 const TYPE_STYLE = {
   sofa: { material: "fabric", legs: "block", legHeight: 6, arms: "slim", back: "loose-cushions" },
@@ -855,6 +856,7 @@ const TYPE_STYLE = {
   daybed: { material: "painted" }, pegboard: { material: "painted" }, wallshelf: { material: "wood" },
   curtain: { material: "fabric" }, officechair: { material: "plastic" }, monitor: { material: "plastic" },
   aquarium: { material: "wood" }, raisedbed: { material: "wood" }, brewkettle: { material: "metal" }, fermenter: { material: "plastic" },
+  guitar: { material: "wood" },
 };
 function measOf(it) {
   return { ...(CATALOG.find((c) => c.re.test(it.slug ?? ""))?.meas ?? {}), ...(it.meas ?? {}) };
@@ -1388,6 +1390,50 @@ function buildFermenter(g, it, mats) {
   const tap = cyl(g, makeMat("#2b2b2d", "plastic"), 0, r + 0.02, 0, 0.04, 0.01, 0.01, 8); tap.rotation.x = Math.PI / 2; tap.position.y = 0.06;
   return [[-w / 2, -w / 2, w / 2, w / 2]];
 }
+// acoustic guitar leaning back on an A-frame stand; local +z is the front of the guitar
+function buildGuitar(g, it, mats) {
+  const L = it.h / 100 * 0.97, bw = Math.min(it.w / 100, L * 0.4), lean = 0.26;
+  const bodyL = L * 0.48, r1 = bw / 2, r2 = bw * 0.37, c1 = r1, c2 = bodyL - r2;
+  const half = (y) => {                                   // half-width of the body at height y: two bouts and a waist
+    const a = y <= 2 * r1 ? Math.sqrt(Math.max(0, r1 * r1 - (y - c1) ** 2)) : 0;
+    const b = y >= bodyL - 2 * r2 ? Math.sqrt(Math.max(0, r2 * r2 - (y - c2) ** 2)) : 0;
+    const waist = (y > c1 && y < c2) ? r2 * 0.82 : 0;
+    return Math.max(a, b, waist);
+  };
+  const N = 36, pts = [];
+  for (let i = 0; i <= N; i++) { const y = bodyL * i / N; pts.push(new THREE.Vector2(half(y), y)); }
+  for (let i = N; i >= 0; i--) { const y = bodyL * i / N; pts.push(new THREE.Vector2(-half(y), y)); }
+  const depth = Math.min(0.11, it.d / 100 * 0.32);
+  const body = new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2 });
+  body.translate(0, 0, -depth / 2);
+  const gtr = new THREE.Group();
+  const top = makeMat(it.colour ?? "#d8b27a", "wood"), side = makeMat(it.colour2 ?? "#6b3f22", "wood"), dark = makeMat("#1d1a17", "plastic");
+  const bm = new THREE.Mesh(body, top); bm.castShadow = true; gtr.add(bm);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(r2 * 0.42, 24), dark); hole.position.set(0, c2 - r2 * 0.2, depth / 2 + 0.007); gtr.add(hole);
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.38, 0.018, 0.01), dark); bridge.position.set(0, bodyL * 0.22, depth / 2 + 0.011); gtr.add(bridge);
+  const neckL = L - bodyL - 0.17;
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.048, neckL, 0.022), side); neck.position.set(0, bodyL + neckL / 2, depth / 2 - 0.006); neck.castShadow = true; gtr.add(neck);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(0.05, neckL + 0.08, 0.006), dark); board.position.set(0, bodyL + neckL / 2 - 0.04, depth / 2 + 0.008); gtr.add(board);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.17, 0.016), side); head.position.set(0, bodyL + neckL + 0.085, depth / 2 - 0.012); head.rotation.x = -0.2; gtr.add(head);
+  for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) {                    // tuning pegs
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.03, 6), makeMat("#c8ccd0", "metal"));
+    p.rotation.z = Math.PI / 2; p.position.set(sx * 0.05, bodyL + neckL + 0.04 + k * 0.045, depth / 2 - 0.012); gtr.add(p);
+  }
+  const strM = new THREE.LineBasicMaterial({ color: 0xd9d4c8, clippingPlanes: [cutPlane] });
+  const strs = [];
+  for (let k = 0; k < 6; k++) { const x = (k - 2.5) * 0.0075; strs.push(new THREE.Vector3(x, bodyL * 0.22, depth / 2 + 0.016), new THREE.Vector3(x * 0.8, bodyL + neckL, depth / 2 + 0.012)); }
+  gtr.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(strs), strM));
+  gtr.rotation.x = -lean; gtr.position.set(0, 0.06, 0.03);                   // leaning back onto the stand
+  g.add(gtr);
+  const iron = makeMat("#2b2b2d", "metal");                                   // A-frame stand
+  for (const sx of [-1, 1]) {
+    const leg = cyl(g, iron, sx * bw * 0.32, -0.05, 0, 0.62, 0.008, 0.008, 6); leg.rotation.x = -0.32; leg.rotation.z = sx * 0.12;
+    blk(g, iron, sx * bw * 0.32 - 0.01, sx * bw * 0.32 + 0.01, 0, 0.012, -0.16, 0.14);
+  }
+  const cradle = blk(g, makeMat("#3a3d40", "plastic"), -bw * 0.4, bw * 0.4, 0.05, 0.08, 0.0, 0.07); if (cradle) cradle.material.side = THREE.FrontSide;
+  const w = it.w / 100, d = it.d / 100;
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
 function buildItem(it) {
   const g = new THREE.Group();
   const st = styleOf(it);
@@ -1400,7 +1446,7 @@ function buildItem(it) {
     storage: buildStorage, shelving: buildStorage, rug: buildRug, lamp: buildLamp, tablelamp: buildTableLamp,
     pendant: buildPendant, plant: buildPlant, deco: buildDeco, daybed: buildDaybed, pegboard: buildPegboard,
     wallshelf: buildWallShelf, curtain: buildCurtain, officechair: buildOfficeChair, monitor: buildMonitor,
-    aquarium: buildAquarium, raisedbed: buildRaisedBed, brewkettle: buildBrewKettle, fermenter: buildFermenter }[it.type];
+    aquarium: buildAquarium, raisedbed: buildRaisedBed, brewkettle: buildBrewKettle, fermenter: buildFermenter, guitar: buildGuitar }[it.type];
   let rects;
   if (fn) rects = fn(g, it, mats, st);
   else { blk(g, main, -it.w / 200, it.w / 200, 0, it.h / 100, -it.d / 200, it.d / 200); rects = [[-it.w / 200, -it.d / 200, it.w / 200, it.d / 200]]; }
@@ -1447,7 +1493,7 @@ function surfaceTop(o) {
     case "officechair": return y + 0.5;
     case "raisedbed": return y + h - 0.04;
     case "pendant": case "lamp": case "tablelamp": case "plant": case "pegboard": case "curtain": case "monitor":
-    case "aquarium": case "brewkettle": case "fermenter": return null;
+    case "aquarium": case "brewkettle": case "fermenter": case "guitar": return null;
     default: return y + h;
   }
 }
