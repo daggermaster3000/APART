@@ -46,6 +46,11 @@ shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, or a pla
   them to dimensions from their positions (text only, and only numbers that are really in the drawing
   are accepted) or you click a number and then the box it belongs to. The builders use these numbers for the model's proportions; VIMLE, KIVIK and MALM carry their
   published measurements already.
+- **More shapes.** Daybed (HEMNES), pegboard (SKÅDIS), wall shelf, curtain, office chair and monitor,
+  next to sofas, beds, tables, desks, chairs, storage, shelving, rugs, lamps, plants and decorations.
+- **View from the door.** In *Rooms*, the eye button next to a room puts the camera in its doorway at
+  eye height. Tables and desks count only their top in the fit check, so chairs and drawer units can
+  stand underneath.
 - **Height.** Each piece has a placement: *On the floor*, *On whatever is below it* (rests on the
   table, sideboard, bed, sofa seat or kitchen counter under it, or the floor if there's nothing),
   *At a set height* (cm above the floor), or *Hanging from the ceiling* (cable length from the

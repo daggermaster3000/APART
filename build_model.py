@@ -288,6 +288,21 @@ glb = scene.export(file_type="glb")
 (OUT / "apartment.glb").write_bytes(glb)
 scene.export(OUT / "apartment.obj", file_type="obj")
 
+def room_door(poly):
+    """Centre of the door opening that leads into this room (for the eye-level view), or None."""
+    best = None
+    for n, kind, r in OPENINGS:
+        if kind != "door":
+            continue
+        o = opening_polys[n]
+        if o.distance(poly) < 0.05 and "Stair" not in n and "Elevator" not in n:
+            c = o.centroid
+            d = poly.exterior.distance(c)
+            if best is None or d < best[0]:
+                best = (d, [round(c.x, 3), round(c.y, 3)])
+    return best[1] if best else None
+
+
 minx, minz, maxx, maxz = footprint.bounds
 info = {
     "name": "Lemgrubenstrasse 8 · Erdgeschoss · L08.02",
@@ -296,7 +311,8 @@ info = {
     "scale_pt_per_m": round(PT_PER_M, 4),
     "wall_height_m": WALL_H, "door_head_m": DOOR_H, "sill_m": SILL_H,
     "extent_m": {"x": round(maxx - minx, 2), "z": round(maxz - minz, 2)},
-    "rooms": [{k: v for k, v in r.items() if k != "poly"} for r in rooms],
+    "rooms": [{**{k: v for k, v in r.items() if k != "poly"}, "bounds": [round(v, 3) for v in r["poly"].bounds],
+               "door": room_door(r["poly"])} for r in rooms],
     "terraces": [
         {"name": "Sitzplatz N", "plan_area_m2": 61.3, "model_area_m2": round(terrace_n.area, 2),
          "label": list(terrace_n.centroid.coords[0])},
