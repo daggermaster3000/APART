@@ -676,10 +676,16 @@ const SHAPES = {
   curtain:  { label: "Curtain",          def: [60, 10, 240] },
   officechair: { label: "Office chair",  def: [65, 65, 100] },
   monitor:  { label: "Monitor / screen", def: [61, 20, 46] },
+  aquarium: { label: "Aquarium on cabinet", def: [120, 50, 130] },
+  raisedbed:{ label: "Raised bed",       def: [200, 80, 70] },
+  brewkettle: { label: "Brew kettle on burner", def: [55, 55, 110] },
+  fermenter:{ label: "Fermenter",        def: [35, 35, 60] },
   box:      { label: "Plain block",      def: [100, 60, 75] },
 };
 // slug keyword -> shape, first match wins (order matters: "sofa-bed" is a sofa)
 const SHAPE_RULES = [
+  [/aquarium|aquarien/, "aquarium"], [/raised-bed|hochbeet|planter-box/, "raisedbed"],
+  [/brew-kettle|braukessel|sudkessel|brewzilla|grainfather/, "brewkettle"], [/fermenter|gärbehälter|garbehalter|gaerbottich/, "fermenter"],
   [/day-?bed|tagesbett|lit-de-repos/, "daybed"], [/pegboard|lochplatte/, "pegboard"],
   [/curtain|vorhang|gardin|rideau/, "curtain"], [/office-chair|swivel-chair|desk-chair|burostuhl|gaming-chair/, "officechair"],
   [/monitor|(^|-)screen(-|$)/, "monitor"], [/wall-shelf|wandregal|floating-shelf|picture-ledge/, "wallshelf"],
@@ -832,6 +838,7 @@ const STYLE_FIELDS = {
   rug: ["material"], lamp: ["material", "shade"], tablelamp: ["material", "shade"], pendant: ["material", "shade"],
   plant: ["material", "foliage"], deco: ["material", "profile"], box: ["material"],
   daybed: ["material"], pegboard: ["material"], wallshelf: ["material"], curtain: ["material"], officechair: ["material"], monitor: ["material"],
+  aquarium: ["material"], raisedbed: ["material"], brewkettle: ["material"], fermenter: ["material"],
 };
 const TYPE_STYLE = {
   sofa: { material: "fabric", legs: "block", legHeight: 6, arms: "slim", back: "loose-cushions" },
@@ -847,6 +854,7 @@ const TYPE_STYLE = {
   deco: { material: "ceramic", profile: "auto" }, box: { material: "painted" },
   daybed: { material: "painted" }, pegboard: { material: "painted" }, wallshelf: { material: "wood" },
   curtain: { material: "fabric" }, officechair: { material: "plastic" }, monitor: { material: "plastic" },
+  aquarium: { material: "wood" }, raisedbed: { material: "wood" }, brewkettle: { material: "metal" }, fermenter: { material: "plastic" },
 };
 function measOf(it) {
   return { ...(CATALOG.find((c) => c.re.test(it.slug ?? ""))?.meas ?? {}), ...(it.meas ?? {}) };
@@ -1089,6 +1097,26 @@ function buildStorage(g, it, mats, st) {
     const n = kallax ? Math.max(1, Math.round(h / 0.39) - 1) : Math.max(1, Math.round(h / 0.36) - 1);
     for (let k = 1; k <= n; k++) { const y = 0.06 + (h - 0.06) * k / (n + 1); blk(g, main, -w / 2 + t, w / 2 - t, y - t / 2, y + t / 2, -d / 2, d / 2); }
     if (kallax) { const c = Math.max(1, Math.round(w / 0.39)); for (let k = 1; k < c; k++) { const x = -w / 2 + w * k / c; blk(g, main, x - t / 2, x + t / 2, 0.06, h - t, -d / 2, d / 2); } }
+    if (st.books) {   // a library: rows of books, a few gaps and a leaning book now and then
+      const rows = n + 1, cols = kallax ? Math.max(1, Math.round(w / 0.39)) : 1;
+      const BOOK = ["#7c8b74", "#8b7765", "#e8dfd0", "#3e5a6b", "#a4593f", "#c9a26b", "#2f3133", "#b8a98f", "#5f6f52", "#d6c9b1"];
+      let seed = (it.id ?? "x").split("").reduce((a2, ch) => a2 * 31 + ch.charCodeAt(0) >>> 0, 7);
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const bookMats = BOOK.map((c) => makeMat(c, "painted"));
+      for (let r = 0; r < rows; r++) {
+        const yb = 0.06 + (h - 0.06) * r / rows + t / 2, yt = 0.06 + (h - 0.06) * (r + 1) / rows - t / 2;
+        for (let c = 0; c < cols; c++) {
+          const xa = -w / 2 + t + (w - 2 * t) * c / cols + (c ? t / 2 : 0), xb = -w / 2 + t + (w - 2 * t) * (c + 1) / cols - (c < cols - 1 ? t / 2 : 0);
+          let x = xa + 0.01; const end = xb - 0.01 - (rnd() < 0.3 ? 0.12 : 0.02);
+          while (x < end) {
+            const bw = 0.018 + rnd() * 0.03, bh = Math.min(yt - yb - 0.01, 0.17 + rnd() * 0.12), bd = Math.min(d - 0.04, 0.17 + rnd() * 0.07);
+            if (x + bw > end) break;
+            blk(g, bookMats[Math.floor(rnd() * BOOK.length)], x, x + bw, yb, yb + bh, -d / 2 + 0.01, -d / 2 + 0.01 + bd);
+            x += bw + 0.001;
+          }
+        }
+      }
+    }
     return [[-w / 2, -d / 2, w / 2, d / 2]];
   }
   const legH = st.legs === "plinth" || st.legs === "none" ? 0 : Math.max(0, cm(measOf(it).legHeight) ?? (st.legHeight ?? 15) / 100);
@@ -1287,6 +1315,79 @@ function buildMonitor(g, it, mats) {
   blk(g, screen, -w / 2 + 0.01, w / 2 - 0.01, h * 0.25 + 0.01, h - 0.01, 0.008, 0.01);
   return [[-w / 2, -d / 2, w / 2, d / 2]];
 }
+function buildAquarium(g, it, mats) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, cab = Math.min(0.8, h * 0.55), tank = h - cab - 0.06;
+  blk(g, mats.dark, -w / 2 + 0.02, w / 2 - 0.02, 0, 0.06, -d / 2 + 0.02, d / 2 - 0.03);           // plinth
+  blk(g, mats.main, -w / 2, w / 2, 0.06, cab, -d / 2, d / 2);                                       // cabinet
+  for (const sx of [-1, 1]) blk(g, makeMat(shade(it.colour, 0.03).getStyle(), "wood"), sx > 0 ? 0.004 : -w / 2 + 0.01, sx > 0 ? w / 2 - 0.01 : -0.004, 0.07, cab - 0.01, d / 2, d / 2 + 0.012);
+  const glass = makeMat("#d6eef0", "glass"); glass.opacity = 0.18;
+  const water = new THREE.MeshPhysicalMaterial({ color: 0x4f9aa3, transparent: true, opacity: 0.32, roughness: 0.05, depthWrite: false, clippingPlanes: [cutPlane] });
+  const y0 = cab + 0.005;
+  blk(g, glass, -w / 2, w / 2, y0, y0 + tank, -d / 2, d / 2);
+  blk(g, water, -w / 2 + 0.008, w / 2 - 0.008, y0 + 0.06, y0 + tank - 0.04, -d / 2 + 0.008, d / 2 - 0.008);
+  blk(g, makeMat("#d9c7a0", "fabric"), -w / 2 + 0.008, w / 2 - 0.008, y0, y0 + 0.06, -d / 2 + 0.008, d / 2 - 0.008); // sand
+  blk(g, makeMat("#2f3133", "metal"), -w / 2, w / 2, y0 + tank, y0 + tank + 0.025, -d / 2, d / 2);                 // lid with light
+  const leaf = makeMat("#3f7a4a", "plastic"); leaf.side = THREE.DoubleSide;
+  let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let k = 0; k < 16; k++) {                                                                      // plants at the back
+    const p = mesh(g, new THREE.PlaneGeometry(0.03, tank * (0.35 + rnd() * 0.5)), leaf, 0);
+    p.position.set(-w / 2 + 0.06 + rnd() * (w - 0.12), y0 + 0.06 + p.geometry.parameters.height / 2, -d / 2 + 0.04 + rnd() * d * 0.35); p.rotation.y = rnd() * 3;
+  }
+  for (let k = 0; k < 3; k++) { const r = mesh(g, new THREE.DodecahedronGeometry(0.05 + rnd() * 0.04, 0), makeMat("#7d7a73", "ceramic"), y0 + 0.07); r.position.x = -w / 3 + k * w / 3 + rnd() * 0.1; r.position.z = rnd() * d * 0.3; }
+  const FISH = ["#f08a3c", "#3c8ff0", "#f0d23c", "#e4572e", "#9b5de5"];
+  for (let k = 0; k < 9; k++) {                                                                       // a small shoal
+    const f = mesh(g, new THREE.SphereGeometry(0.018, 10, 6), new THREE.MeshStandardMaterial({ color: FISH[k % FISH.length], roughness: 0.4, clippingPlanes: [cutPlane] }), y0 + 0.12 + rnd() * (tank - 0.22));
+    f.scale.set(1.8, 1, 0.6); f.position.x = -w / 2 + 0.1 + rnd() * (w - 0.2); f.position.z = -d / 2 + 0.1 + rnd() * (d - 0.2); f.rotation.y = rnd() * 6; f.castShadow = false;
+  }
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+function buildRaisedBed(g, it, mats) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, t = 0.04;
+  const wood = mats.main, soil = makeMat("#4a3728", "fabric");
+  for (let y = 0; y < h - 0.005; y += 0.14) {                                                         // stacked planks
+    const y1 = Math.min(h, y + 0.135);
+    blk(g, wood, -w / 2, w / 2, y, y1, -d / 2, -d / 2 + t); blk(g, wood, -w / 2, w / 2, y, y1, d / 2 - t, d / 2);
+    blk(g, wood, -w / 2, -w / 2 + t, y, y1, -d / 2 + t, d / 2 - t); blk(g, wood, w / 2 - t, w / 2, y, y1, -d / 2 + t, d / 2 - t);
+  }
+  blk(g, soil, -w / 2 + t, w / 2 - t, h - 0.1, h - 0.04, -d / 2 + t, d / 2 - t);
+  const greens = ["#5d8c4a", "#7fae5a", "#3f6e3a", "#8fbf6a"].map((c) => makeMat(c, "plastic"));
+  let seed = (it.id ?? "rb").length * 97 + 13; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const cols = Math.max(2, Math.round((w - 0.2) / 0.28)), rows = Math.max(1, Math.round((d - 0.2) / 0.28));
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {                                    // lettuce, herbs, a few tall plants
+    const x = -w / 2 + 0.14 + (w - 0.28) * (cols === 1 ? 0.5 : i / (cols - 1)), z = -d / 2 + 0.14 + (d - 0.28) * (rows === 1 ? 0.5 : j / (rows - 1));
+    const tall = (i + j) % 4 === 0, r = tall ? 0.09 : 0.07 + rnd() * 0.03;
+    const b = mesh(g, new THREE.IcosahedronGeometry(r, 0), greens[(i + 2 * j) % greens.length], h - 0.04 + r * (tall ? 2.2 : 0.8));
+    b.position.x = x; b.position.z = z; b.scale.y = tall ? 2.6 : 0.9;
+    if (tall) { const st = cyl(g, makeMat("#8a6a45", "wood"), x, z, h - 0.04, h + 0.55, 0.006, 0.006, 6); st.castShadow = false; }
+  }
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+function buildBrewKettle(g, it, mats) {
+  const w = it.w / 100, h = it.h / 100, stand = Math.max(0.3, h * 0.38), r = w / 2 - 0.02;
+  const iron = makeMat("#2b2b2d", "metal"), steel = makeMat(it.colour ?? "#c8ccd0", "metal");
+  for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3, l = cyl(g, iron, Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9, 0, stand, 0.012, 0.012, 6); l.rotation.z = Math.cos(a) * 0.1; }
+  cyl(g, iron, 0, 0, stand - 0.04, stand, r * 0.95, r * 0.95, 24);                                   // ring
+  cyl(g, makeMat("#3a3d40", "metal"), 0, 0, stand - 0.1, stand - 0.06, r * 0.45, r * 0.45, 20);      // burner
+  cyl(g, steel, 0, 0, stand, h - 0.02, r, r, 32);                                                    // kettle
+  cyl(g, steel, 0, 0, h - 0.02, h, r * 1.02, r * 1.02, 32);                                          // lid
+  cyl(g, iron, 0, 0, h, h + 0.04, 0.025, 0.025, 10);
+  const tap = cyl(g, steel, 0, r + 0.04, 0, 0.08, 0.012, 0.012, 8); tap.rotation.x = Math.PI / 2; tap.position.y = stand + 0.08;
+  for (const sx of [-1, 1]) { const hd = cyl(g, steel, sx * (r + 0.02), 0, 0, 0.1, 0.01, 0.01, 6); hd.rotation.x = Math.PI / 2; hd.position.y = h - 0.08; }
+  return [[-w / 2, -w / 2, w / 2, w / 2]];
+}
+function buildFermenter(g, it, mats) {
+  const w = it.w / 100, h = it.h / 100, r = w / 2;
+  const body = makeMat(it.colour ?? "#f1f0ec", (styleOf(it).material ?? "plastic") === "metal" ? "metal" : "plastic");
+  if (body.transparent !== true && (styleOf(it).material ?? "plastic") !== "metal") { body.transparent = true; body.opacity = 0.85; }
+  cyl(g, body, 0, 0, 0, h * 0.85, r * 0.96, r, 28);
+  mesh(g, new THREE.CylinderGeometry(r * 0.35, r * 0.96, h * 0.1, 28), body, h * 0.9);                // shoulder
+  cyl(g, makeMat("#d9a441", "plastic"), 0, 0, h * 0.95, h * 0.98, r * 0.3, r * 0.3, 16);              // lid
+  cyl(g, makeMat("#e8f0f0", "glass"), 0, 0, h * 0.98, h + 0.06, 0.012, 0.016, 10);                     // airlock
+  const beer = new THREE.MeshStandardMaterial({ color: 0xc8822f, transparent: true, opacity: 0.55, roughness: 0.3, clippingPlanes: [cutPlane] });
+  if ((styleOf(it).material ?? "plastic") !== "metal") cyl(g, beer, 0, 0, 0.01, h * 0.6, r * 0.9, r * 0.92, 24);
+  const tap = cyl(g, makeMat("#2b2b2d", "plastic"), 0, r + 0.02, 0, 0.04, 0.01, 0.01, 8); tap.rotation.x = Math.PI / 2; tap.position.y = 0.06;
+  return [[-w / 2, -w / 2, w / 2, w / 2]];
+}
 function buildItem(it) {
   const g = new THREE.Group();
   const st = styleOf(it);
@@ -1298,7 +1399,8 @@ function buildItem(it) {
   const fn = { sofa: buildSofa, armchair: buildSofa, bed: buildBed, table: buildTable, desk: buildTable, chair: buildChair,
     storage: buildStorage, shelving: buildStorage, rug: buildRug, lamp: buildLamp, tablelamp: buildTableLamp,
     pendant: buildPendant, plant: buildPlant, deco: buildDeco, daybed: buildDaybed, pegboard: buildPegboard,
-    wallshelf: buildWallShelf, curtain: buildCurtain, officechair: buildOfficeChair, monitor: buildMonitor }[it.type];
+    wallshelf: buildWallShelf, curtain: buildCurtain, officechair: buildOfficeChair, monitor: buildMonitor,
+    aquarium: buildAquarium, raisedbed: buildRaisedBed, brewkettle: buildBrewKettle, fermenter: buildFermenter }[it.type];
   let rects;
   if (fn) rects = fn(g, it, mats, st);
   else { blk(g, main, -it.w / 200, it.w / 200, 0, it.h / 100, -it.d / 200, it.d / 200); rects = [[-it.w / 200, -it.d / 200, it.w / 200, it.d / 200]]; }
@@ -1318,10 +1420,16 @@ const OBST = [...INFO.obstacles.walls.map((p) => ({ rings: p, wall: true, top: 9
 const CEIL = INFO.wall_height_m;
 const MOUNT_DEFAULT = { deco: "surface", plant: "surface", tablelamp: "surface", pendant: "ceiling", monitor: "surface", pegboard: "custom", wallshelf: "custom" };
 const defaultMount = (type) => MOUNT_DEFAULT[type] ?? "floor";
+// ground level at (x, z): 0 indoors, the paving, lawn or kerb outside
+function floorAt(x, z) {
+  for (const g of INFO.grounds ?? []) { const [a, b, c, d] = g.rect; if (x >= a && x <= c && z >= b && z <= d) return g.y; }
+  return 0;
+}
 function elevM(it) {
   if (it.mount === "ceiling") return Math.max(0, CEIL - (it.drop ?? 60) / 100 - it.h / 100);
-  if (it.mount === "floor" || !it.mount) return 0;
-  return Math.max(0, (it.elev ?? 0) / 100);
+  if (it.mount === "floor" || !it.mount) return floorAt(it.x, it.z);
+  if (it.mount === "surface") return (it.elev ?? 0) / 100;           // absolute: settle() measured it
+  return floorAt(it.x, it.z) + Math.max(0, (it.elev ?? 0) / 100);     // custom: above the floor below
 }
 const vRange = (it) => [elevM(it), elevM(it) + it.h / 100];
 // for fit checks a table or desk is only its top: chairs and drawer units go underneath
@@ -1337,13 +1445,15 @@ function surfaceTop(o) {
     case "chair": return y + Math.min(0.46, h * 0.56);
     case "daybed": return y + 0.56;
     case "officechair": return y + 0.5;
-    case "pendant": case "lamp": case "tablelamp": case "plant": case "pegboard": case "curtain": case "monitor": return null;
+    case "raisedbed": return y + h - 0.04;
+    case "pendant": case "lamp": case "tablelamp": case "plant": case "pegboard": case "curtain": case "monitor":
+    case "aquarium": case "brewkettle": case "fermenter": return null;
     default: return y + h;
   }
 }
 // what is under (x, z): the highest furniture top or fixture top there, else the floor
 function supportAt(it, x, z) {
-  let best = { top: 0, id: null };
+  let best = { top: floorAt(x, z), id: null };
   for (const o of items) {
     if (o.id === it.id || o.mount === "ceiling") continue;
     const t = surfaceTop(o); if (t === null) continue;
@@ -1363,7 +1473,7 @@ function settle(it, x = it.x, z = it.z) {
 }
 function heightText(it) {
   if (it.mount === "ceiling") return `hangs ${Math.round(it.drop ?? 60)} cm below ceiling`;
-  const e = Math.round(elevM(it) * 100);
+  const e = Math.round((elevM(it) - floorAt(it.x, it.z)) * 100);
   if (it.mount === "surface") return e > 0 ? `on top, ${e} cm up` : "on the floor";
   if (it.mount === "custom") return `${e} cm up`;
   return "";
@@ -1663,7 +1773,7 @@ function rotateItem(it, deg) {
 }
 function setHeight(it, deltaCm) {
   if (it.mount === "ceiling") it.drop = Math.max(0, Math.min(CEIL * 100 - it.h, (it.drop ?? 60) - deltaCm));
-  else { it.elev = Math.max(0, Math.min(CEIL * 100 - it.h, Math.round(elevM(it) * 100) + deltaCm)); it.mount = "custom"; }
+  else { it.elev = Math.max(0, Math.min(CEIL * 100 - it.h, Math.round((elevM(it) - floorAt(it.x, it.z)) * 100) + deltaCm)); it.mount = "custom"; }
   if (it.type === "pendant") refreshItem(it); else placeGroup(it);
   persist(it); resettleAll(); renderList();
 }

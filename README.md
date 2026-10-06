@@ -10,6 +10,8 @@ built from the brochure floor plan in `source/floorplan_L08.02.pdf`.
 | `model/apartment.obj` + `material.mtl` | Same model as Wavefront OBJ. |
 | `model/apartment.json` | Rooms with plan area (BF) vs. measured model area. |
 | `build_model.py` | Regenerates everything from the PDF. |
+| `moodboard/` | The apartment moodboard page (`build_moodboard.py` builds it from the model and a layout; renders in `img/`). |
+| `layouts/` | Scripts that produced the Zimmer 2 and whole-apartment layouts. |
 
 ## Furniture planner
 
@@ -51,6 +53,9 @@ shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, or a pla
 - **View from the door.** In *Rooms*, the eye button next to a room puts the camera in its doorway at
   eye height. Tables and desks count only their top in the fit check, so chairs and drawer units can
   stand underneath.
+- **Garden and hobbies.** Aquarium on a cabinet, raised bed, brew kettle on a burner and fermenter
+  shapes; bookcases can be filled with books (`style.books`). Pieces outside stand on the real ground
+  level: the paving and lawn sit 16-18 cm below the flat's floor.
 - **Height.** Each piece has a placement: *On the floor*, *On whatever is below it* (rests on the
   table, sideboard, bed, sofa seat or kitchen counter under it, or the floor if there's nothing),
   *At a set height* (cm above the floor), or *Hanging from the ceiling* (cable length from the

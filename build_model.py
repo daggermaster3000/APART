@@ -154,9 +154,9 @@ for name, (bf, (lx, ly)) in LABELS.items():
 
 # --- non-apartment surfaces --------------------------------------------------
 stair_floor = mbox(144.72, 261.17, 209.7, 355.0).difference(walls)
-terrace_n = mbox(206.06, 160.55, 382.4, 257.75)      # Sitzplatz N, 61.3 m²
+terrace_n = mbox(206.06, 160.55, 382.4, 257.75)      # Sitzplatz east (page top; north points to page-left), 61.3 m²
 terrace_n_tiles = mbox(315.8, 165.0, 379.0, 257.75)   # paved part, 19.48 m²
-terrace_s = mbox(318.0, 460.95, 379.2, 516.7)         # Sitzplatz S, 15.0 m²
+terrace_s = mbox(318.0, 460.95, 379.2, 516.7)         # Sitzplatz west (page bottom), 15.0 m²
 edge_n = mbox(206.06, 160.55, 382.4, 168.9)           # grey edge band (planter / kerb)
 
 # --- openings: (name, kind, rect in pt) --------------------------------------
@@ -314,11 +314,14 @@ info = {
     "rooms": [{**{k: v for k, v in r.items() if k != "poly"}, "bounds": [round(v, 3) for v in r["poly"].bounds],
                "door": room_door(r["poly"])} for r in rooms],
     "terraces": [
-        {"name": "Sitzplatz N", "plan_area_m2": 61.3, "model_area_m2": round(terrace_n.area, 2),
+        {"name": "Sitzplatz E", "plan_area_m2": 61.3, "model_area_m2": round(terrace_n.area, 2),
          "label": list(terrace_n.centroid.coords[0])},
-        {"name": "Sitzplatz S", "plan_area_m2": 15.0, "model_area_m2": round(terrace_s.area, 2),
+        {"name": "Sitzplatz W", "plan_area_m2": 15.0, "model_area_m2": round(terrace_s.area, 2),
          "label": list(terrace_s.centroid.coords[0])},
     ],
+    # ground level outside, so garden furniture stands on the paving or lawn (first match wins)
+    "grounds": [{"name": n, "rect": [round(v, 3) for v in p.bounds], "y": y} for n, p, y in [
+        ("Kerb", edge_n, 0.25), ("Paving E", terrace_n_tiles, -0.16), ("Lawn", terrace_n, -0.18), ("Paving W", terrace_s, -0.16)]],
     "shared": [{"name": "Treppenhaus", "plan_area_m2": 18.4,
                 "label": list(m(170, 342))}],
 }

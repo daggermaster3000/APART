@@ -1,0 +1,131 @@
+<title>Sage &amp; Oak · Lemgrubenstrasse 8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Karla:wght@400;500;600&family=Caveat:wght@500&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* Layout: one paper moodboard sheet: title band with palette, plan beside the overview render, then one spread per zone.
+   Single deliberate light "paper" look in every theme. */
+:root {
+  --paper: #f2efe7; --card: #fbf9f4; --ink: #2f3133; --muted: #6b6a63; --rule: #d9d3c6;
+  --sage: #7c8b74; --sage-l: #b9c3ad; --oat: #e8dfd0; --oak: #c9a26b; --taupe: #8b7765; --taupe-l: #b7a898;
+  --lake: #3e7c82; --steel: #c8ccd0; --lawn: #cfdcc0; --paving: #e3ded3; --kerb: #bdb7aa; --floor: #f8f5ee;
+  --fixture: #dedad2; --piece: #fffdf8;
+  --f-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --f-body: "Karla", "Helvetica Neue", Arial, sans-serif;
+  --f-hand: "Caveat", "Bradley Hand", cursive;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.sheet { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 56px; display: grid; gap: 44px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 400; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(34px, 5vw, 56px); line-height: 1.05; letter-spacing: -0.01em; }
+h1 em { color: var(--sage); }
+h2 { font-size: 26px; }
+h3 { font-size: 24px; }
+.eyebrow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+header.top { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; align-items: end; border-bottom: 1px solid var(--rule); padding-bottom: 28px; }
+.lede { max-width: 60ch; margin: 12px 0 0; color: var(--ink); }
+.palette { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 10px; }
+.sw { display: grid; gap: 4px; justify-items: start; font-size: 12.5px; }
+.sw i { width: 52px; height: 52px; border-radius: 50%; display: block; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.sw b { font-weight: 600; } .sw code { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.note { font-family: var(--f-hand); font-size: 26px; line-height: 1.15; color: var(--taupe); transform: rotate(-3deg); margin: 6px 0 0; }
+.board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 20px; align-items: start; }
+.panel { background: var(--card); border: 1px solid var(--rule); padding: 14px; display: grid; gap: 8px; }
+.panel svg { width: 100%; height: auto; display: block; }
+.panel img { width: 100%; display: block; }
+.cap { font-size: 12.5px; color: var(--muted); margin: 0; }
+svg .lbl { font: 600 11px var(--f-body); fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--floor); stroke-width: 3px; }
+svg .lbl.small { font-weight: 500; text-anchor: start; stroke: none; }
+.materials { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.mat { aspect-ratio: 1 / 1; max-width: 100%; display: flex; align-items: end; padding: 8px; font-size: 12px; font-weight: 600; color: var(--ink); border: 1px solid var(--rule); }
+.mat span { background: var(--card); padding: 1px 6px; }
+.m-oak { background: repeating-linear-gradient(92deg, #c9a26b 0 6px, #bf955c 6px 9px, #d3ad79 9px 15px); }
+.m-linen { background: repeating-linear-gradient(0deg, #e8dfd0 0 2px, #e1d6c4 2px 3px), #e8dfd0; background-blend-mode: multiply; }
+.m-wool { background: radial-gradient(circle at 30% 30%, #8a9a80 0 2px, transparent 3px) 0 0 / 9px 9px, #7c8b74; }
+.m-rattan { background: repeating-linear-gradient(45deg, #b08a5a 0 5px, #c7a376 5px 10px), repeating-linear-gradient(-45deg, transparent 0 5px, rgba(0,0,0,.08) 5px 10px); }
+.m-water { background: linear-gradient(180deg, #8fc3c4, #3e7c82); }
+.m-steel { background: linear-gradient(115deg, #e6e8ea, #b9bec3 45%, #eef0f1 55%, #aeb3b8); }
+.zones { display: grid; gap: 44px; }
+.zone { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 26px; align-items: start; border-top: 1px solid var(--rule); padding-top: 26px; }
+.zone:nth-child(even) .pics { order: 2; }
+.pics { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.shot { margin: 0; grid-column: 1 / -1; background: var(--card); border: 1px solid var(--rule); padding: 8px; }
+.shot.small { grid-column: auto / span 2; }
+.shot img { width: 100%; display: block; }
+.shot figcaption { font-size: 12px; color: var(--muted); padding-top: 6px; letter-spacing: 0.06em; text-transform: uppercase; }
+.txt { display: grid; gap: 12px; min-width: 0; }
+.txt p { margin: 0; max-width: 62ch; }
+ul.ideas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+ul.ideas li { padding-left: 24px; position: relative; }
+ul.ideas li::before { content: "✓"; position: absolute; left: 0; color: var(--sage); font-weight: 600; }
+ul.pieces { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+ul.pieces li { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--rule); font-size: 13.5px; align-items: baseline; }
+ul.pieces span { font-weight: 600; } ul.pieces em { font-style: normal; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ul.pieces code { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+footer { border-top: 1px solid var(--rule); padding-top: 22px; display: grid; gap: 8px; color: var(--muted); font-size: 13.5px; }
+footer a { color: var(--ink); }
+a:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+@media (max-width: 860px) {
+  header.top, .board, .zone { grid-template-columns: 1fr; }
+  .zone:nth-child(even) .pics { order: 0; }
+  .materials { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .palette { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+</style>
+
+<main class="sheet">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Lemgrubenstrasse 8 · Erdgeschoss · L08.02 · 94 m² + 76 m² garden</div>
+      <h1>Sage &amp; Oak, <em>with water and books</em></h1>
+      <p class="lede">A calm, natural home built on what is already there: the grey VIMLE, the oak dining table, the pine bed and the
+        sage work room. Oak and linen everywhere, sage as the one colour, charcoal for lines and lamps, and a lake-green
+        aquarium at the heart of a new library. Outside, a kitchen garden in two raised beds and a beer garden with its own brewing corner.</p>
+      <p class="note">read, grow, brew, repeat ♡</p>
+    </div>
+    <div class="palette" aria-label="Colour palette">
+      <div class="sw"><i style="background:var(--sage)"></i><b>Sage</b><code>#7C8B74</code></div>
+      <div class="sw"><i style="background:var(--oat)"></i><b>Oat</b><code>#E8DFD0</code></div>
+      <div class="sw"><i style="background:var(--oak)"></i><b>Oak</b><code>#C9A26B</code></div>
+      <div class="sw"><i style="background:var(--taupe)"></i><b>Taupe</b><code>#8B7765</code></div>
+      <div class="sw"><i style="background:var(--ink)"></i><b>Charcoal</b><code>#2F3133</code></div>
+      <div class="sw"><i style="background:var(--lake)"></i><b>Lake</b><code>#3E7C82</code></div>
+      <div class="sw"><i style="background:#f1f0ec"></i><b>Chalk</b><code>#F1F0EC</code></div>
+      <div class="sw"><i style="background:#b08a5a"></i><b>Rattan</b><code>#B08A5A</code></div>
+    </div>
+  </header>
+
+  <div class="board">
+    <div class="panel">
+      <img src="img/overview.jpg" alt="3D overview of the furnished apartment and both gardens">
+      <p class="cap">The whole flat from the south-east, cut at 2.1 m. {{COUNT}} pieces, all at their real sizes.</p>
+    </div>
+    <div class="panel">
+      {{PLAN}}
+      <p class="cap">Plan, north up. Walls traced from the brochure plan; every piece drawn at its real footprint.</p>
+    </div>
+  </div>
+
+  <div>
+    <h2 style="margin-bottom:12px">Materials</h2>
+    <div class="materials">
+      <div class="mat m-oak"><span>Oak</span></div>
+      <div class="mat m-linen"><span>Linen</span></div>
+      <div class="mat m-wool"><span>Sage wool</span></div>
+      <div class="mat m-rattan"><span>Rattan</span></div>
+      <div class="mat m-water"><span>Water</span></div>
+      <div class="mat m-steel"><span>Brushed steel</span></div>
+    </div>
+  </div>
+
+  <div class="zones">
+    {{ZONES}}
+  </div>
+
+  <footer>
+    <p>Applied to the shared 3D planner: <a href="https://claude.ai/artifact/AU4Q1joHJ5591a2iKdLMtk" target="_blank" rel="noopener">open the apartment model</a>.
+      Under <em>Share &amp; save</em> you'll find <b>Apartment moodboard</b> (this board) and <b>Before the apartment moodboard</b> (the layout as it was).</p>
+    <p>Sizes are in centimetres, width × depth × height. Renders come from the planner itself.</p>
+  </footer>
+</main>

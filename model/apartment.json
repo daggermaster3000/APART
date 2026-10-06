@@ -127,7 +127,7 @@
   ],
   "terraces": [
     {
-      "name": "Sitzplatz N",
+      "name": "Sitzplatz E",
       "plan_area_m2": 61.3,
       "model_area_m2": 70.74,
       "label": [
@@ -136,13 +136,55 @@
       ]
     },
     {
-      "name": "Sitzplatz S",
+      "name": "Sitzplatz W",
       "plan_area_m2": 15.0,
       "model_area_m2": 14.08,
       "label": [
         13.123474238725425,
         14.844854169343439
       ]
+    }
+  ],
+  "grounds": [
+    {
+      "name": "Kerb",
+      "rect": [
+        3.966,
+        -6.244,
+        15.295,
+        -5.708
+      ],
+      "y": 0.25
+    },
+    {
+      "name": "Paving E",
+      "rect": [
+        11.016,
+        -5.958,
+        15.076,
+        0.0
+      ],
+      "y": -0.16
+    },
+    {
+      "name": "Lawn",
+      "rect": [
+        3.966,
+        -6.244,
+        15.295,
+        0.0
+      ],
+      "y": -0.18
+    },
+    {
+      "name": "Paving W",
+      "rect": [
+        11.158,
+        13.054,
+        15.089,
+        16.636
+      ],
+      "y": -0.16
     }
   ],
   "shared": [
