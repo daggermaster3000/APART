@@ -117,3 +117,15 @@ figure appears to exclude.
 pip install pymupdf shapely trimesh mapbox_earcut numpy
 python3 build_model.py
 ```
+
+## Walkthrough
+
+`visit/index.html` (published at https://claude.ai/artifact/7vA4adb91nijc7ZCmDqxEH) is a realistic, first-person
+visit of the furnished flat: ten tour stops, walking (drag to look, WASD or click the floor), a plan that shows
+where you stand, the real sun path for Zurich on 8 October (morning, midday, golden hour, night with the lamps on),
+a dollhouse view, and **Photo** mode, which path-traces the current view with
+[three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer) and refines while you hold still.
+
+Build it with `python3 build_visit.py`. The furniture code is copied from `viewer_template.html`, so pieces look
+exactly as in the planner; their positions come from `visit/items.json`, a snapshot of the planner's shared layout.
+

@@ -1,0 +1,851 @@
+<title>Lemgrubenstrasse 8 Walkthrough</title>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Karla:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed render; a quiet glass HUD in the four corners (room card, plan, time of day, tour strip).
+   One deliberate dark look in every theme, so the picture stays the brightest thing on screen. */
+:root {
+  --night: #121413;                 /* page ground behind the canvas */
+  --glass: rgba(20, 23, 21, 0.62);  /* HUD panels */
+  --glass-hi: rgba(32, 36, 33, 0.82);
+  --chalk: #f1f0ec;                 /* text */
+  --mist: #b9bdb4;                  /* secondary text */
+  --sage: #a9b99d;                  /* accent, the moodboard's sage lifted for a dark ground */
+  --oak: #d6b27c;                   /* time-of-day / sun */
+  --line: rgba(241, 240, 236, 0.16);
+  --f-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --f-body: "Karla", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--night); color: var(--chalk); font-family: var(--f-body); font-size: 14px; overflow: hidden; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; outline: none; }
+#stage canvas:active { cursor: grabbing; }
+.panel { background: var(--glass); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid var(--line); border-radius: 12px; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+
+/* room card */
+#room { position: fixed; left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); padding: 14px 18px 14px; max-width: min(380px, calc(100vw - 32px)); display: grid; gap: 4px; }
+.eyebrow { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mist); }
+#roomName { font-family: var(--f-display); font-size: clamp(24px, 3.2vw, 34px); line-height: 1.08; font-weight: 400; margin: 0; text-wrap: balance; }
+#roomNote { margin: 2px 0 0; color: var(--mist); max-width: 46ch; line-height: 1.45; }
+#roomMeta { font-family: var(--f-mono); font-size: 11.5px; color: var(--sage); font-variant-numeric: tabular-nums; }
+
+/* plan */
+#mapWrap { position: fixed; right: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); padding: 8px; display: grid; gap: 4px; }
+#map { width: 210px; height: auto; display: block; cursor: crosshair; touch-action: none; }
+.mapcap { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: 10.5px; color: var(--mist); padding: 0 2px; }
+
+/* bottom bar */
+#bar { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: grid;
+  grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; pointer-events: none; }
+#bar > * { pointer-events: auto; }
+#tour { display: flex; align-items: center; gap: 6px; padding: 6px; min-width: 0; }
+#stops { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; min-width: 0; scroll-behavior: smooth; }
+#stops::-webkit-scrollbar { display: none; }
+.stop { flex: none; padding: 8px 12px; border-radius: 8px; color: var(--mist); white-space: nowrap; font-weight: 500; transition: background .2s, color .2s; }
+.stop:hover { color: var(--chalk); background: rgba(241, 240, 236, 0.06); }
+.stop[aria-current="true"] { color: var(--night); background: var(--chalk); }
+.stop b { font-family: var(--f-mono); font-weight: 400; font-size: 11px; margin-right: 6px; opacity: .7; }
+.iconbtn { flex: none; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; color: var(--chalk); }
+.iconbtn:hover { background: rgba(241, 240, 236, 0.08); }
+.iconbtn svg { width: 18px; height: 18px; }
+#play[aria-pressed="true"] { color: var(--night); background: var(--sage); }
+
+#tools { display: grid; gap: 8px; padding: 10px 12px; width: 300px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.row.between { justify-content: space-between; }
+#clock { font-family: var(--f-mono); font-size: 12px; color: var(--oak); font-variant-numeric: tabular-nums; min-width: 9ch; }
+#tod { flex: 1; min-width: 0; accent-color: var(--oak); }
+.presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.chip { padding: 6px 4px; border-radius: 7px; font-size: 12.5px; color: var(--mist); border: 1px solid var(--line); text-align: center; }
+.chip:hover { color: var(--chalk); border-color: rgba(241,240,236,.32); }
+.chip[aria-pressed="true"] { color: var(--night); background: var(--oak); border-color: var(--oak); }
+.modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.mode { padding: 9px 8px; border-radius: 8px; font-weight: 600; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; gap: 7px; }
+.mode:hover { border-color: rgba(241,240,236,.36); }
+.mode[aria-pressed="true"] { background: var(--chalk); color: var(--night); border-color: var(--chalk); }
+.mode svg { width: 16px; height: 16px; }
+#status { font-family: var(--f-mono); font-size: 11px; color: var(--mist); min-height: 1.3em; font-variant-numeric: tabular-nums; }
+
+#help { position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); padding: 8px 14px; font-size: 12.5px; color: var(--mist);
+  transition: opacity .6s; white-space: nowrap; }
+#help kbd { font-family: var(--f-mono); font-size: 11px; color: var(--chalk); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+#loader { position: fixed; inset: 0; display: grid; place-items: center; background: var(--night); transition: opacity .8s; z-index: 5; }
+#loader div { display: grid; gap: 10px; justify-items: center; text-align: center; padding-inline: 16px; }
+#loader h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(28px, 5vw, 44px); margin: 0; }
+#loader h1 em { color: var(--sage); }
+#loadMsg { font-family: var(--f-mono); font-size: 12px; color: var(--mist); }
+#loader.gone { opacity: 0; pointer-events: none; }
+
+@media (max-width: 860px) {
+  #help { display: none; }
+  #bar { grid-template-columns: minmax(0, 1fr); }
+  #tools { width: auto; }
+  #map { width: 150px; }
+  #roomNote { display: none; }
+}
+@media (max-width: 520px) {
+  #mapWrap { display: none; }
+  #room { right: 16px; }
+}
+@media (max-height: 560px) {
+  .presets, #roomNote, #mapWrap, #help { display: none; }
+  #tools { gap: 6px; padding: 8px 10px; }
+  #roomName { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { #loader, .stop, #help { transition: none; } }
+</style>
+
+<div id="stage"></div>
+
+<section id="room" class="panel" aria-live="polite">
+  <div class="eyebrow">Lemgrubenstrasse 8 · Erdgeschoss · L08.02</div>
+  <h2 id="roomName">Korridor</h2>
+  <p id="roomNote"></p>
+  <div id="roomMeta"></div>
+</section>
+
+<div id="help" class="panel">Drag to look · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or click the floor to walk · scroll to zoom</div>
+
+<aside id="mapWrap" class="panel" aria-label="Plan">
+  <canvas id="map" width="420" height="560" aria-label="Plan of the apartment. Click to walk there."></canvas>
+  <div class="mapcap"><span>N ←</span><span>1 : 200</span></div>
+</aside>
+
+<div id="bar">
+  <nav id="tour" class="panel" aria-label="Tour stops">
+    <button class="iconbtn" id="prev" aria-label="Previous stop"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12.5 4 6.5 10l6 6"/></svg></button>
+    <div id="stops" role="list"></div>
+    <button class="iconbtn" id="next" aria-label="Next stop"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m7.5 4 6 6-6 6"/></svg></button>
+    <button class="iconbtn" id="play" aria-pressed="false" aria-label="Play the tour"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6 4.5v11l9-5.5z"/></svg></button>
+  </nav>
+  <section id="tools" class="panel" aria-label="Light and view">
+    <div class="row between"><span class="eyebrow">Sun · 8 October</span><span id="clock">08:30</span></div>
+    <input type="range" id="tod" min="6" max="23" step="0.05" value="8.5" aria-label="Time of day">
+    <div class="presets" role="group" aria-label="Time presets">
+      <button class="chip" data-t="8.5">Morning</button><button class="chip" data-t="13.25">Midday</button>
+      <button class="chip" data-t="18.1">Golden</button><button class="chip" data-t="21">Night</button>
+    </div>
+    <div class="modes">
+      <button class="mode" id="photo" aria-pressed="false" title="Path-trace this view: real light bounces, soft shadows"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="5.5" width="15" height="11" rx="2"/><circle cx="10" cy="11" r="3"/><path d="M7 5.5 8.2 3.5h3.6L13 5.5"/></svg>Photo</button>
+      <button class="mode" id="doll" aria-pressed="false" title="Lift the roof and look in from above"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8.5 10 4l7 4.5V16H3z"/><path d="M3 8.5h14"/></svg>Dollhouse</button>
+    </div>
+    <div id="status" role="status"></div>
+  </section>
+</div>
+
+<div id="loader"><div><h1>Lemgrubenstrasse 8, <em>walk through</em></h1><span id="loadMsg">Building the apartment…</span></div></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.6/build/index.module.js",
+  "three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.23/build/index.module.js"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const INFO = /*MODEL_INFO*/null;
+const GLB = "MODEL_GLB_BASE64";
+const ITEMS = /*ITEMS*/[];
+const $ = (id) => document.getElementById(id);
+const touch = matchMedia("(pointer: coarse)").matches;
+const EYE = 1.6;
+
+// ---------- renderer, post ----------
+const stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, touch ? 1.5 : 1.75));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;
+renderer.domElement.tabIndex = 0;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+// fields the path tracer reads on every scene, its own included (three r162 adds them; harmless here)
+Object.assign(THREE.Scene.prototype, { backgroundRotation: new THREE.Euler(), environmentRotation: new THREE.Euler(), environmentIntensity: 1, backgroundIntensity: 1 });
+const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 400);
+camera.rotation.order = "YXZ";
+const cutPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1000); // used by the shared furniture builders; lowered in dollhouse view
+
+const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+const composer = new EffectComposer(renderer, rt);
+composer.addPass(new RenderPass(scene, camera));
+const gtao = new GTAOPass(scene, camera, 1, 1);
+gtao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.6, thickness: 1.2, scale: 1.1, samples: 16 });
+gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
+gtao.blendIntensity = 0.85;
+gtao.enabled = !touch;
+composer.addPass(gtao);
+composer.addPass(new OutputPass());
+
+// ---------- procedural textures (canvas, so the page needs no image hosts) ----------
+let seed = 11;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+function canvasTex(size, draw, { srgb = true, repeat = 1 } = {}) {
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  draw(c.getContext("2d"), size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.repeat.set(repeat, repeat);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function noise(x, s, a) { const d = x.getImageData(0, 0, s, s); for (let i = 0; i < d.data.length; i += 4) { const n = (rnd() - 0.5) * a; d.data[i] += n; d.data[i + 1] += n; d.data[i + 2] += n; } x.putImageData(d, 0, 0); }
+// oak planks: 1 texture = 2.4 m square, planks 18 cm wide, staggered butt joints
+function oakPlanks(rough) {
+  return canvasTex(1024, (x, s) => {
+    seed = 3; const pw = s / (2.4 / 0.18), rows = Math.ceil(s / pw);
+    for (let r = 0; r < rows; r++) {
+      let y0 = r * pw, xx = -rnd() * s * 0.5;
+      while (xx < s) {
+        const len = s * (0.35 + rnd() * 0.45);
+        const tone = rough ? 150 + rnd() * 40 : 0;
+        if (rough) { x.fillStyle = `rgb(${tone},${tone},${tone})`; }
+        else { const h = 31 + rnd() * 6, l = 56 + rnd() * 10, sat = 46 + rnd() * 12; x.fillStyle = `hsl(${h} ${sat}% ${l}%)`; }
+        x.fillRect(xx, y0, len, pw);
+        if (!rough) for (let k = 0; k < 14; k++) { // grain
+          x.strokeStyle = `rgba(110,70,30,${0.04 + rnd() * 0.07})`; x.lineWidth = 0.6 + rnd() * 1.4;
+          const yy = y0 + rnd() * pw; x.beginPath(); x.moveTo(xx, yy);
+          for (let t = 0; t <= len; t += 24) x.lineTo(xx + t, yy + Math.sin((t + k * 40) * 0.012) * pw * 0.12);
+          x.stroke();
+        }
+        x.fillStyle = rough ? "rgb(235,235,235)" : "rgba(60,38,20,0.55)"; // joint
+        x.fillRect(xx + len - 1, y0, 1.5, pw); xx += len;
+      }
+      x.fillStyle = rough ? "rgb(235,235,235)" : "rgba(60,38,20,0.5)"; x.fillRect(0, y0 + pw - 1, s, 1.5);
+    }
+    noise(x, s, rough ? 18 : 10);
+  }, { srgb: !rough });
+}
+function tiles(c1, joint, tw, th, sizeM) { // tw/th in metres
+  return canvasTex(512, (x, s) => {
+    seed = 5; const k = s / sizeM; x.fillStyle = joint; x.fillRect(0, 0, s, s);
+    for (let j = 0; j < sizeM / th; j++) for (let i = 0; i < sizeM / tw; i++) {
+      const l = 0.94 + rnd() * 0.08; x.fillStyle = c1(l); x.fillRect(i * tw * k + 1.5, j * th * k + 1.5, tw * k - 3, th * k - 3);
+    }
+    noise(x, s, 8);
+  });
+}
+function plaster(base) {
+  return canvasTex(512, (x, s) => { seed = 9; x.fillStyle = base; x.fillRect(0, 0, s, s); noise(x, s, 7);
+    for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(0,0,0,${rnd() * 0.025})`; x.beginPath(); x.arc(rnd() * s, rnd() * s, rnd() * 6, 0, 7); x.fill(); } });
+}
+function lawn() {
+  return canvasTex(512, (x, s) => { seed = 13; x.fillStyle = "#5f7d3f"; x.fillRect(0, 0, s, s);
+    for (let i = 0; i < 26000; i++) { const h = 78 + rnd() * 30, l = 24 + rnd() * 22; x.strokeStyle = `hsla(${h},45%,${l}%,0.75)`; x.lineWidth = 1;
+      const px = rnd() * s, py = rnd() * s; x.beginPath(); x.moveTo(px, py); x.lineTo(px + (rnd() - 0.5) * 3, py - 2 - rnd() * 5); x.stroke(); } });
+}
+function facade() { // 3 m storey bands with windows, 1 texture = 6 m
+  return canvasTex(512, (x, s) => { const k = s / 6; x.fillStyle = "#ece9e2"; x.fillRect(0, 0, s, s); noise(x, s, 6);
+    for (const wx of [0.9, 3.9]) for (const wy of [0.7, 3.7]) { x.fillStyle = "#3d4347"; x.fillRect(wx * k, wy * k, 1.3 * k, 1.6 * k);
+      x.fillStyle = "rgba(170,195,215,0.35)"; x.fillRect(wx * k + 4, wy * k + 4, 1.3 * k - 8, 0.6 * k); x.fillStyle = "#cfcac0"; x.fillRect((wx - 0.08) * k, (wy + 1.6) * k, 1.46 * k, 0.07 * k); }
+    x.fillStyle = "rgba(0,0,0,0.08)"; x.fillRect(0, 2.95 * k, s, 0.05 * k); x.fillRect(0, 5.95 * k, s, 0.05 * k); });
+}
+const TX = {
+  oak: oakPlanks(false), oakR: oakPlanks(true),
+  wet: tiles((l) => `rgb(${Math.round(214 * l)},${Math.round(216 * l)},${Math.round(212 * l)})`, "#a9aaa5", 0.3, 0.6, 1.2),
+  paving: tiles((l) => `rgb(${Math.round(186 * l)},${Math.round(178 * l)},${Math.round(164 * l)})`, "#7d776c", 0.4, 0.4, 1.6),
+  stair: tiles((l) => `rgb(${Math.round(170 * l)},${Math.round(168 * l)},${Math.round(160 * l)})`, "#8a8880", 0.6, 0.3, 1.2),
+  plaster: plaster("#f1efe9"), lawn: lawn(), facade: facade(),
+};
+// planar UVs from world coordinates, metres -> texture units
+function worldUV(o, scale) {
+  const g = o.geometry, p = g.attributes.position, n = g.attributes.normal;
+  o.updateWorldMatrix(true, false);
+  const v = new THREE.Vector3(), nm = new THREE.Vector3(), nmat = new THREE.Matrix3().getNormalMatrix(o.matrixWorld);
+  const uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+    if (n) nm.fromBufferAttribute(n, i).applyMatrix3(nmat).normalize(); else nm.set(0, 1, 0);
+    let a, b;
+    if (Math.abs(nm.y) > 0.6) { a = v.x; b = v.z; } else if (Math.abs(nm.x) > Math.abs(nm.z)) { a = v.z; b = v.y; } else { a = v.x; b = v.y; }
+    uv[i * 2] = a / scale; uv[i * 2 + 1] = b / scale;
+  }
+  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+}
+
+// ---------- the shared furniture builders, copied from the planner at build time ----------
+/*CATALOG*/
+/*BUILDERS*/
+/*HEIGHTS*/
+edgeMat.visible = false; // the planner's outline strokes would read as drawing, not photo
+
+// ---------- sky and sun for Zurich, 8 October ----------
+const LAT = 47.4 * Math.PI / 180, DECL = -6.0 * Math.PI / 180;
+function sunAt(clock) {
+  const H = (clock - 13.22) * 15 * Math.PI / 180; // solar noon ≈ 13:13 CEST at 8.5° E
+  const sinEl = Math.sin(LAT) * Math.sin(DECL) + Math.cos(LAT) * Math.cos(DECL) * Math.cos(H);
+  const az = Math.PI + Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(LAT) - Math.tan(DECL) * Math.cos(LAT)); // from north, clockwise
+  const el = Math.asin(sinEl);
+  // plan axes: north = -x, east = -z, south = +x, west = +z
+  return { el, az, dir: new THREE.Vector3(-Math.cos(az) * Math.cos(el), Math.sin(el), -Math.sin(az) * Math.cos(el)).normalize() };
+}
+const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+let skyTex = null;
+function makeSky(sun) {
+  const W = 256, H = 128, data = new Float32Array(W * H * 4);
+  const s = Math.sin(sun.el), day = sstep(-0.1, 0.18, s), warm = (1 - sstep(0.04, 0.4, s)) * sstep(-0.12, 0.0, s);
+  let zen = mix([0.012, 0.016, 0.034], [0.16, 0.33, 0.74], day), hor = mix([0.03, 0.035, 0.055], [0.7, 0.79, 0.9], day);
+  hor = mix(hor, [1.05, 0.62, 0.36], warm * 0.85); zen = mix(zen, [0.24, 0.27, 0.5], warm * 0.4);
+  const ground = mix([0.01, 0.012, 0.012], [0.24, 0.25, 0.21], day);
+  const glow = mix([1.0, 0.85, 0.65], [1.0, 0.55, 0.28], warm);
+  const d = new THREE.Vector3();
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const th = ((i + 0.5) / W - 0.5) * Math.PI * 2, la = ((j + 0.5) / H - 0.5) * Math.PI;
+    d.set(Math.cos(la) * Math.cos(th), Math.sin(la), Math.cos(la) * Math.sin(th));
+    let c;
+    if (d.y >= 0) { const t = Math.pow(1 - d.y, 3.2); c = mix(zen, hor, t); }
+    else c = mix(hor, ground, sstep(0, 0.12, -d.y));
+    const cs = Math.max(0, d.dot(sun.dir));
+    const g = (Math.pow(cs, 10) * 0.35 + Math.pow(cs, 90) * 1.2) * sstep(-0.15, 0.05, s);
+    const k = (j * W + i) * 4;
+    data[k] = c[0] + glow[0] * g; data[k + 1] = c[1] + glow[1] * g; data[k + 2] = c[2] + glow[2] * g; data[k + 3] = 1;
+  }
+  const t = new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.FloatType);
+  t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.LinearSRGBColorSpace;
+  t.magFilter = t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true;
+  return { tex: t, day, warm, hor };
+}
+const sunLight = new THREE.DirectionalLight(0xffffff, 3);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(touch ? 2048 : 4096, touch ? 2048 : 4096);
+Object.assign(sunLight.shadow.camera, { left: -17, right: 17, top: 17, bottom: -17, near: 1, far: 90 });
+sunLight.shadow.bias = -0.00015; sunLight.shadow.normalBias = 0.025;
+scene.add(sunLight, sunLight.target);
+const fill = new THREE.HemisphereLight(0xf2f4f5, 0xd9c6aa, 0.0); // stands in for light bounced off floor and walls (raster view only)
+scene.add(fill);
+
+// ---------- apartment ----------
+const CENTER = new THREE.Vector3(9.6, 0, 6.2);
+const world = new THREE.Group(); scene.add(world);
+const floorMeshes = [], glassMeshes = [], envMats = [];
+let roofMass = null;
+const plainMat = (o) => new THREE.MeshStandardMaterial({ clippingPlanes: [cutPlane], ...o });
+function dressModel(root) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const name = o.name || o.parent?.name || "", mname = o.material.name;
+    if (!o.geometry.attributes.normal) { // the exported model has no normals: give it crisp, flat ones
+      o.geometry = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+      o.geometry.computeVertexNormals();
+    }
+    let m;
+    if (/^glass/.test(name)) {
+      m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.08, depthWrite: false, clippingPlanes: [cutPlane] });
+      o.userData.glass = true; glassMeshes.push(o); o.castShadow = false;
+    } else if (mname === "floor_room") { worldUV(o, 2.4); m = plainMat({ map: TX.oak, roughnessMap: TX.oakR, roughness: 0.62, color: 0xffffff }); }
+    else if (mname === "floor_wet") { worldUV(o, 1.2); m = plainMat({ map: TX.wet, roughness: 0.35 }); }
+    else if (mname === "floor_stair" || /stair step/.test(name)) { worldUV(o, 1.2); m = plainMat({ map: TX.stair, roughness: 0.55 }); }
+    else if (mname === "lawn") { worldUV(o, 2.2); m = plainMat({ map: TX.lawn, roughness: 0.95 }); }
+    else if (mname === "terrace_tiles") { worldUV(o, 1.6); m = plainMat({ map: TX.paving, roughness: 0.85 }); }
+    else if (mname === "wall" || mname === "slab" || mname === "edge") { worldUV(o, 1.6); m = plainMat({ map: TX.plaster, roughness: 0.92, color: mname === "edge" ? 0xb8b3a8 : 0xffffff }); }
+    else if (mname === "frame") m = plainMat({ color: 0x3a3e42, roughness: 0.45, metalness: 0.4 });
+    else if (mname === "counter") m = plainMat({ color: 0x8c8a84, roughness: 0.3 });
+    else if (mname === "cabinet") m = plainMat({ color: 0xf2f0ea, roughness: 0.38 });
+    else if (mname === "steel") m = plainMat({ color: 0xc4c8cc, roughness: 0.28, metalness: 0.9 });
+    else if (mname === "sanitary") m = plainMat({ color: 0xfafaf8, roughness: 0.12 });
+    else if (mname === "dark") m = plainMat({ color: 0x1c1c1c, roughness: 0.25 });
+    else m = plainMat({ color: o.material.color, roughness: 0.8 });
+    o.material = m;
+    if (o.castShadow !== false) o.castShadow = !/floor|slab|terrace|lawn/.test(name);
+    o.receiveShadow = true;
+    if (/floor|terrace|slab|stair step/.test(name)) floorMeshes.push(o);
+  });
+}
+function addSurroundings(box) {
+  // the storeys above: ceiling for this flat, a plain rendered block for the house
+  const x0 = box.min.x, x1 = box.max.x, z0 = box.min.z, z1 = box.max.z;
+  const mass = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 9.4, z1 - z0), plainMat({ map: TX.facade, roughness: 0.9 }));
+  mass.position.set((x0 + x1) / 2, INFO.wall_height_m + 4.7, (z0 + z1) / 2);
+  worldUV(mass, 6); mass.castShadow = true; mass.receiveShadow = true;
+  // the ceiling face gets clean plaster instead of the window pattern
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), plainMat({ map: TX.plaster, roughness: 0.95 }));
+  ceil.rotation.x = Math.PI / 2; ceil.position.set((x0 + x1) / 2, INFO.wall_height_m - 0.002, (z0 + z1) / 2); worldUV(ceil, 1.6);
+  ceil.receiveShadow = true;
+  roofMass = new THREE.Group(); roofMass.add(mass, ceil); world.add(roofMass);
+  // neighbourhood ground, a laurel hedge round the garden
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(160, 48), plainMat({ map: TX.lawn, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(CENTER.x, -0.22, CENTER.z); worldUV(ground, 2.2); ground.receiveShadow = true;
+  world.add(ground); floorMeshes.push(ground);
+  const leaf = plainMat({ color: 0x3e5a32, roughness: 0.9, map: TX.lawn });
+  const hedge = (ax, az, bx, bz) => { const h = new THREE.Mesh(new RoundedBoxGeometry(Math.max(0.7, bx - ax), 1.7, Math.max(0.7, bz - az), 3, 0.25), leaf);
+    h.position.set((ax + bx) / 2, -0.18 + 0.85, (az + bz) / 2); h.castShadow = h.receiveShadow = true; world.add(h); };
+  hedge(3.2, -7.4, 16.2, -6.7); hedge(15.5, -7.4, 16.2, -0.2); hedge(3.2, -7.4, 3.9, -0.2); hedge(15.6, 12.9, 16.3, 17.2); hedge(10.6, 16.9, 16.3, 17.6);
+}
+
+// ---------- furniture ----------
+const lamps = [];
+function buildFurniture() {
+  for (const it of ITEMS) {
+    let g;
+    try { g = buildItem(it); } catch (e) { console.warn("skipped", it.id, e); continue; }
+    g.position.set(it.x, elevM(it), it.z);
+    g.rotation.y = (it.rot ?? 0) * Math.PI / 180;
+    furnRoot.add(g);
+    it.rects = g.userData.rects;
+    if (/lamp|pendant/.test(it.type)) {
+      g.updateMatrixWorld(true);
+      const b = new THREE.Box3().setFromObject(g), c = b.getCenter(new THREE.Vector3());
+      const y = it.type === "pendant" ? elevM(it) + 0.02 : b.max.y - (it.type === "lamp" ? 0.2 : 0.12);
+      const light = new THREE.PointLight(0xffc27a, 0, 0, 2);
+      light.position.set(c.x, y, c.z);
+      scene.add(light);
+      const shades = [];
+      g.traverse((o) => { if (o.isMesh && o.castShadow === false && o.material.emissive) { o.material = o.material.clone(); shades.push(o.material); } });
+      lamps.push({ light, shades, power: { pendant: 9, lamp: 8, tablelamp: 4 }[it.type] });
+    }
+  }
+}
+
+// ---------- walls for walking ----------
+const BLOCK = [...INFO.obstacles.walls.map((p) => p[0]), ...INFO.obstacles.fixtures.map((p) => p[0])].map((r) => {
+  const xs = r.map((v) => v[0]), zs = r.map((v) => v[1]);
+  return { r, bb: [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)] };
+});
+function inRing2(x, z, r) {
+  let c = false;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    const [xi, zi] = r[i], [xj, zj] = r[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+  }
+  return c;
+}
+function segDist(px, pz, [ax, az], [bx, bz]) {
+  const dx = bx - ax, dz = bz - az, l = dx * dx + dz * dz || 1;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l));
+  return Math.hypot(px - ax - t * dx, pz - az - t * dz);
+}
+let furnBoxes = [];
+function collectFurnBoxes() {
+  furnBoxes = [];
+  for (const it of ITEMS) {
+    if (!it.rects || it.type === "rug" || it.type === "curtain" || it.mount === "ceiling" || it.mount === "surface" || it.h < 30 || it.mount === "custom") continue;
+    const a = (it.rot ?? 0) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    for (const [x0, z0, x1, z1] of it.rects) {
+      const pts = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(([x, z]) => [it.x + x * c + z * s, it.z - x * s + z * c]);
+      const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
+      furnBoxes.push([Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)]);
+    }
+  }
+}
+const R = 0.2;
+function blocked(x, z) {
+  for (const o of BLOCK) {
+    if (x < o.bb[0] - R || x > o.bb[2] + R || z < o.bb[1] - R || z > o.bb[3] + R) continue;
+    if (inRing2(x, z, o.r)) return true;
+    for (let i = 0, j = o.r.length - 1; i < o.r.length; j = i++) if (segDist(x, z, o.r[j], o.r[i]) < R) return true;
+  }
+  for (const b of furnBoxes) if (x > b[0] - R * 0.6 && x < b[2] + R * 0.6 && z > b[1] - R * 0.6 && z < b[3] + R * 0.6) return true;
+  return x < -6 || x > 26 || z < -14 || z > 24;
+}
+
+// ---------- where am I ----------
+const ROOM_NOTES = {
+  "Wohnen / Essen": "Library wall and aquarium, the oak table under two rattan domes, the sofa looking west to the terrace.",
+  "Zimmer 1": "The bedroom: pine bed, oat linen, white wardrobes and an oak dresser.",
+  "Zimmer 2": "Work and guest room: daybed, desk with SKÅDIS boards, gallery wall.",
+  "Korridor": "Entrance hall with shoe cabinet, bench and coat hooks.",
+  "Bad": "Bathroom with tub, basin and WC.",
+  "Reduit": "Storage room with the washer-dryer.",
+};
+function placeName(x, z) {
+  if (z < 0.05 && x > 3.9) return { name: "Garden · Sitzplatz E", note: "Lawn, two larch raised beds, a beer-garden table and the brewing corner.", area: INFO.terraces?.[0]?.plan_area_m2 };
+  if (z > 12.95) return { name: "Terrace · Sitzplatz W", note: "Small paved terrace for the evening sun.", area: INFO.terraces?.[1]?.plan_area_m2 };
+  for (const r of INFO.rooms) { const [a, b, c, d] = r.bounds; if (x >= a - 0.08 && x <= c + 0.08 && z >= b - 0.08 && z <= d + 0.08) return { name: r.name, note: ROOM_NOTES[r.name] ?? "", area: r.plan_area_m2, dims: [c - a, d - b] }; }
+  if (x < 4.2) return { name: "Treppenhaus", note: "Shared stairwell and lift.", area: INFO.shared?.[0]?.plan_area_m2 };
+  return { name: "Outside", note: "" };
+}
+let lastPlace = "";
+function updateRoomCard(force) {
+  const p = placeName(camera.position.x, camera.position.z);
+  if (p.name === lastPlace && !force) return;
+  lastPlace = p.name;
+  $("roomName").textContent = p.name;
+  $("roomNote").textContent = p.note;
+  const bits = [];
+  if (p.area) bits.push(`${p.area.toFixed(1)} m²`);
+  if (p.dims) bits.push(`${p.dims[0].toFixed(2)} × ${p.dims[1].toFixed(2)} m`);
+  if (p.dims) bits.push(`ceiling ${INFO.wall_height_m.toFixed(2)} m`);
+  $("roomMeta").textContent = bits.join(" · ");
+}
+
+// ---------- tour ----------
+const STOPS = [
+  { name: "Hall", pos: [4.95, EYE, 5.7], tgt: [10.5, 1.15, 5.5] },
+  { name: "Library", pos: [11.75, EYE, 8.25], tgt: [14.6, 1.1, 5.6] },
+  { name: "Aquarium", pos: [14.2, 1.45, 8.3], tgt: [11.4, 1.0, 6.3] },
+  { name: "Dining", pos: [11.55, EYE, 6.3], tgt: [13.9, 0.9, 1.4] },
+  { name: "Lounge", pos: [14.35, EYE, 7.6], tgt: [12.4, 0.75, 11.4] },
+  { name: "Bedroom", pos: [5.2, EYE, 4.3], tgt: [7.4, 0.9, 1.2] },
+  { name: "Zimmer 2", pos: [9.25, EYE, 4.25], tgt: [9.9, 1.0, 0.8] },
+  { name: "Garden", pos: [5.0, 1.45, -5.3], tgt: [11.2, 0.55, -1.8] },
+  { name: "Brewing", pos: [12.4, 1.5, -0.7], tgt: [14.8, 0.5, -4.2] },
+  { name: "Terrace", pos: [12.5, 1.55, 12.3], tgt: [13.6, 0.4, 15.4] },
+];
+let stopIdx = 0;
+function renderStops() {
+  const box = $("stops"); box.innerHTML = "";
+  STOPS.forEach((s, i) => {
+    const b = document.createElement("button"); b.className = "stop"; b.setAttribute("role", "listitem");
+    b.innerHTML = `<b>${String(i + 1).padStart(2, "0")}</b>${s.name}`;
+    b.onclick = () => { stopTour(); goStop(i); };
+    box.appendChild(b);
+  });
+}
+function markStop(i) {
+  [...$("stops").children].forEach((b, k) => b.setAttribute("aria-current", k === i ? "true" : "false"));
+  $("stops").children[i]?.scrollIntoView({ block: "nearest", inline: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+
+// ---------- camera: walk (custom) and dollhouse (orbit) ----------
+let yaw = 0, pitch = 0, mode = "walk";
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enabled = false; orbit.enableDamping = true; orbit.maxPolarAngle = Math.PI / 2 - 0.05; orbit.minDistance = 4; orbit.maxDistance = 45;
+orbit.addEventListener("change", () => markDirty());
+function lookAngles(from, to) {
+  const dx = to[0] - from[0], dy = to[1] - from[1], dz = to[2] - from[2];
+  return { yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)) };
+}
+function applyLook() { camera.rotation.set(pitch, yaw, 0, "YXZ"); }
+let glide = null;
+const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+function glideTo(pos, ang, dur = 1.8) {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let dy = ang.yaw - yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  glide = { t0: performance.now(), dur: reduce ? 0.01 : dur * 1000, p0: camera.position.clone(), p1: new THREE.Vector3(...pos), y0: yaw, y1: yaw + dy, q0: pitch, q1: ang.pitch };
+}
+function goStop(i) {
+  stopIdx = (i + STOPS.length) % STOPS.length;
+  const s = STOPS[stopIdx];
+  if (mode !== "walk") setMode("walk", true);
+  glideTo(s.pos, lookAngles(s.pos, s.tgt), mode === "walk" && camera.position.distanceTo(new THREE.Vector3(...s.pos)) < 0.3 ? 0.6 : 2.0);
+  markStop(stopIdx);
+}
+let tourTimer = 0;
+function stopTour() { clearInterval(tourTimer); tourTimer = 0; $("play").setAttribute("aria-pressed", "false"); $("play").setAttribute("aria-label", "Play the tour"); }
+$("play").onclick = () => {
+  if (tourTimer) return stopTour();
+  $("play").setAttribute("aria-pressed", "true"); $("play").setAttribute("aria-label", "Pause the tour");
+  goStop(stopIdx + 1);
+  tourTimer = setInterval(() => goStop(stopIdx + 1), 7500);
+};
+$("prev").onclick = () => { stopTour(); goStop(stopIdx - 1); };
+$("next").onclick = () => { stopTour(); goStop(stopIdx + 1); };
+
+// pointer: drag looks, a short click on the floor walks there
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let drag = null;
+const pointers = new Map();
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  renderer.domElement.focus({ preventScroll: true });
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (mode !== "walk") return;
+  renderer.domElement.setPointerCapture(e.pointerId);
+  drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: false };
+});
+renderer.domElement.addEventListener("pointermove", (e) => {
+  const prevP = pointers.get(e.pointerId); if (prevP) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (mode !== "walk" || !drag) return;
+  if (pointers.size >= 2) { // two-finger drag: walk forward / back
+    const dy = e.clientY - (prevP?.y ?? e.clientY);
+    stepBy(dy * 0.006, 0); drag.moved = true; return;
+  }
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 5) drag.moved = true;
+  if (!drag.moved) return;
+  glide = null; stopTour();
+  const k = (camera.fov / 62) * 0.0042;
+  yaw += dx * k; pitch = Math.max(-1.25, Math.min(1.25, pitch + dy * k));
+  applyLook(); markDirty();
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (mode !== "walk" || !drag) return;
+  const d = drag; drag = null;
+  if (d.moved || performance.now() - d.t > 450 || pointers.size) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects([...floorMeshes, furnRoot, world], true)[0];
+  if (!hit) return;
+  // walk to the spot, stopping short of whatever was clicked
+  let tx = hit.point.x, tz = hit.point.z;
+  const isFloor = floorMeshes.includes(hit.object) || hit.face?.normal?.y > 0.8 && hit.point.y < 0.3;
+  if (!isFloor) { const v = new THREE.Vector3(tx - camera.position.x, 0, tz - camera.position.z); const l = v.length(); if (l < 1.1) return; v.multiplyScalar((l - 1.0) / l); tx = camera.position.x + v.x; tz = camera.position.z + v.z; }
+  if (blocked(tx, tz)) { // try a little back towards the camera
+    const v = new THREE.Vector3(camera.position.x - tx, 0, camera.position.z - tz).normalize();
+    let ok = false; for (let k = 1; k <= 8 && !ok; k++) { const ax = tx + v.x * k * 0.15, az = tz + v.z * k * 0.15; if (!blocked(ax, az)) { tx = ax; tz = az; ok = true; } }
+    if (!ok) return;
+  }
+  stopTour();
+  const dist = Math.hypot(tx - camera.position.x, tz - camera.position.z);
+  glideTo([tx, floorAt(tx, tz) + EYE, tz], { yaw, pitch: Math.max(-0.35, Math.min(0.25, pitch)) }, Math.min(2.2, 0.5 + dist * 0.28));
+}
+renderer.domElement.addEventListener("pointerup", endPointer);
+renderer.domElement.addEventListener("pointercancel", (e) => { pointers.delete(e.pointerId); drag = null; });
+renderer.domElement.addEventListener("wheel", (e) => {
+  if (mode !== "walk") return;
+  e.preventDefault();
+  camera.fov = Math.max(30, Math.min(80, camera.fov + e.deltaY * 0.03)); camera.updateProjectionMatrix(); markDirty();
+}, { passive: false });
+
+const keys = new Set();
+addEventListener("keydown", (e) => {
+  if (e.target.closest?.("input,button") && !/^(Arrow|Key[WASD])/.test(e.code)) return;
+  if (e.target.tagName === "INPUT") return;
+  if (/^(Arrow(Up|Down|Left|Right)|Key[WASDQE]|ShiftLeft|ShiftRight)$/.test(e.code)) { keys.add(e.code); if (e.code.startsWith("Arrow")) e.preventDefault(); stopTour(); glide = null; }
+});
+addEventListener("keyup", (e) => keys.delete(e.code));
+addEventListener("blur", () => keys.clear());
+function stepBy(fwd, side) {
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw), sx = Math.cos(yaw), sz = -Math.sin(yaw);
+  const dx = fx * fwd + sx * side, dz = fz * fwd + sz * side;
+  const p = camera.position;
+  if (!blocked(p.x + dx, p.z + dz)) { p.x += dx; p.z += dz; }
+  else { if (!blocked(p.x + dx, p.z)) p.x += dx; else if (!blocked(p.x, p.z + dz)) p.z += dz; }
+  markDirty();
+}
+
+// ---------- dollhouse ----------
+function setMode(m, quiet) {
+  mode = m;
+  $("doll").setAttribute("aria-pressed", m === "orbit" ? "true" : "false");
+  if (m === "orbit") {
+    glide = null; stopTour();
+    roofMass.visible = false; cutPlane.constant = 2.35;
+    orbit.target.set(CENTER.x, 0, CENTER.z - 1);
+    camera.position.set(CENTER.x + 13, 17, CENTER.z - 14);
+    camera.fov = 40; camera.updateProjectionMatrix();
+    orbit.enabled = true; orbit.update();
+    $("roomName").textContent = "The whole flat"; $("roomNote").textContent = "94 m² inside, 76.3 m² of garden. Drag to turn, scroll to zoom; pick a stop to step back in.";
+    $("roomMeta").textContent = "3½ rooms · Erdgeschoss"; lastPlace = "";
+  } else {
+    orbit.enabled = false; roofMass.visible = true; cutPlane.constant = 1000;
+    camera.fov = 62; camera.updateProjectionMatrix();
+    if (!quiet) goStop(stopIdx);
+  }
+  markDirty();
+}
+$("doll").onclick = () => setMode(mode === "orbit" ? "walk" : "orbit");
+
+// ---------- time of day ----------
+let clock = 8.5, skyState = null, baseExposure = 1;
+function fmtClock(t) { const h = Math.floor(t), m = Math.round((t - h) * 60); return `${String(h + (m === 60 ? 1 : 0)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; }
+function setClock(t) {
+  clock = t;
+  const sun = sunAt(t), sky = makeSky(sun);
+  skyState?.tex.dispose();
+  skyState = sky;
+  scene.background = sky.tex; scene.environment = sky.tex;
+  const up = Math.max(0, Math.sin(sun.el));
+  sunLight.visible = sun.el > -0.02;
+  sunLight.intensity = 3.0 * sstep(-0.02, 0.2, Math.sin(sun.el));
+  sunLight.color.setRGB(1, 0.82 + 0.16 * sstep(0.05, 0.4, up), 0.62 + 0.3 * sstep(0.05, 0.45, up));
+  sunLight.position.copy(CENTER).addScaledVector(sun.dir, 40); sunLight.target.position.copy(CENTER);
+  fill.intensity = 0.85 * sky.day + 0.04;
+  fill.color.setRGB(...mix([0.95, 0.96, 0.97], sky.hor.map((v) => Math.min(1, v)), 0.6 * sky.warm));
+  const night = 1 - sstep(-0.12, 0.06, Math.sin(sun.el));
+  for (const l of lamps) {
+    l.light.intensity = l.power * Math.max(night, 0.0);
+    for (const m of l.shades) { m.emissive.set(0xffcf94); m.emissiveIntensity = 1.6 * night; }
+  }
+  baseExposure = 0.92 + 0.35 * night;
+  renderer.toneMappingExposure = baseExposure * (photoOn ? 1.45 : 1);
+  $("clock").textContent = fmtClock(t);
+  $("tod").value = t;
+  document.querySelectorAll(".presets .chip").forEach((c) => c.setAttribute("aria-pressed", Math.abs(Number(c.dataset.t) - t) < 0.3 ? "true" : "false"));
+  if (pt) { pt.updateEnvironment(); pt.updateLights(); pt.updateMaterials(); pt.reset(); }
+  markDirty();
+}
+$("tod").addEventListener("input", (e) => setClock(Number(e.target.value)));
+document.querySelectorAll(".presets .chip").forEach((c) => c.onclick = () => setClock(Number(c.dataset.t)));
+
+// ---------- photo mode: progressive path tracing ----------
+let pt = null, photoOn = false, ptLoading = false;
+const glassPhoto = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0, metalness: 0, transmission: 1, ior: 1.5, thickness: 0.006 });
+const glassRaster = new Map();
+function setStatus(t) { $("status").textContent = t; }
+async function setPhoto(on) {
+  if (on === photoOn || ptLoading) return;
+  if (on) {
+    ptLoading = true; $("photo").setAttribute("aria-pressed", "true");
+    setStatus("Loading the path tracer…");
+    try {
+      const { WebGLPathTracer } = await import("three-gpu-pathtracer");
+      setStatus("Preparing the scene…");
+      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
+      for (const g of glassMeshes) { glassRaster.set(g, g.material); g.material = glassPhoto; }
+      if (!pt) {
+        pt = new WebGLPathTracer(renderer);
+        pt.tiles.set(touch ? 3 : 2, touch ? 3 : 2);
+        pt.bounces = 6; pt.filteredGlossyFactor = 0.5; pt.minSamples = 1; pt.fadeDuration = 300;
+        pt.renderScale = touch ? 0.6 : Math.min(1, 1.25 / renderer.getPixelRatio());
+        pt.dynamicLowRes = true;
+      }
+      pt.setScene(scene, camera);
+      photoOn = true; renderer.toneMappingExposure = baseExposure * 1.45;
+    } catch (e) {
+      console.error(e);
+      for (const [g, m] of glassRaster) g.material = m;
+      $("photo").setAttribute("aria-pressed", "false");
+      setStatus("Photo mode needs WebGL 2 and the jsDelivr CDN; it could not start here.");
+    }
+    ptLoading = false;
+  } else {
+    photoOn = false; $("photo").setAttribute("aria-pressed", "false"); renderer.toneMappingExposure = baseExposure;
+    for (const [g, m] of glassRaster) g.material = m;
+    setStatus(""); markDirty();
+  }
+}
+$("photo").onclick = () => setPhoto(!photoOn);
+
+// ---------- plan ----------
+const map = $("map"), mx = map.getContext("2d");
+const MAP = { x0: 2.6, z0: -7.6, x1: 17.0, z1: 17.8 };
+let mapScale = 1, mapOx = 0, mapOy = 0;
+function layoutMap() {
+  // brochure orientation: x to the right, z downwards, north to the left
+  const W = map.width, H = map.height, sx = W / (MAP.x1 - MAP.x0), sz = H / (MAP.z1 - MAP.z0);
+  mapScale = Math.min(sx, sz); mapOx = (W - (MAP.x1 - MAP.x0) * mapScale) / 2; mapOy = (H - (MAP.z1 - MAP.z0) * mapScale) / 2;
+}
+const toMap = (x, z) => [mapOx + (x - MAP.x0) * mapScale, mapOy + (z - MAP.z0) * mapScale];
+const fromMap = (u, v) => [(u - mapOx) / mapScale + MAP.x0, (v - mapOy) / mapScale + MAP.z0];
+let mapBase = null;
+function drawMapBase() {
+  layoutMap();
+  const c = document.createElement("canvas"); c.width = map.width; c.height = map.height; const x = c.getContext("2d");
+  const poly = (r) => { x.beginPath(); r.forEach(([a, b], i) => { const [u, v] = toMap(a, b); i ? x.lineTo(u, v) : x.moveTo(u, v); }); x.closePath(); };
+  for (const g of INFO.grounds) { const [a, b, cc, d] = g.rect, [u0, v0] = toMap(a, b), [u1, v1] = toMap(cc, d);
+    x.fillStyle = /Lawn/.test(g.name) ? "rgba(140,170,110,0.35)" : /Kerb/.test(g.name) ? "rgba(200,195,185,0.35)" : "rgba(215,205,190,0.32)"; x.fillRect(u0, v0, u1 - u0, v1 - v0); }
+  for (const r of INFO.rooms) { const [a, b, cc, d] = r.bounds, [u0, v0] = toMap(a, b), [u1, v1] = toMap(cc, d); x.fillStyle = "rgba(214,178,124,0.16)"; x.fillRect(u0, v0, u1 - u0, v1 - v0); }
+  x.fillStyle = "rgba(241,240,236,0.18)";
+  for (const it of ITEMS) { if (!it.rects || it.type === "rug" || it.mount === "ceiling") continue;
+    const a = (it.rot ?? 0) * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a);
+    for (const [x0, z0, x1, z1] of it.rects) poly([[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(([p, q]) => [it.x + p * cs + q * sn, it.z - p * sn + q * cs])), x.fill(); }
+  x.fillStyle = "#f1f0ec";
+  for (const p of INFO.obstacles.walls) { poly(p[0]); x.fill(); }
+  x.fillStyle = "rgba(241,240,236,0.45)";
+  for (const p of INFO.obstacles.fixtures) { poly(p[0]); x.fill(); }
+  x.font = "500 17px Karla, sans-serif"; x.fillStyle = "rgba(241,240,236,0.72)"; x.textAlign = "center";
+  for (const r of INFO.rooms) { if (r.name === "Reduit" || r.name === "Bad") continue; const [a, b, cc, d] = r.bounds, [u, v] = toMap((a + cc) / 2, (b + d) / 2);
+    x.save(); x.translate(u, v); if (cc - a < d - b) x.rotate(-Math.PI / 2); x.fillText(r.name === "Wohnen / Essen" ? "Wohnen" : r.name, 0, 5); x.restore(); }
+  mapBase = c;
+}
+function drawMap() {
+  if (!mapBase) return;
+  mx.clearRect(0, 0, map.width, map.height); mx.drawImage(mapBase, 0, 0);
+  if (mode !== "walk") return;
+  const [u, v] = toMap(camera.position.x, camera.position.z);
+  const f = -Math.sin(yaw), g = -Math.cos(yaw), half = (camera.fov * camera.aspect / 2) * Math.PI / 180 * 0.55, L = 44;
+  const dir = Math.atan2(g, f);
+  const grad = mx.createRadialGradient(u, v, 2, u, v, L); grad.addColorStop(0, "rgba(214,178,124,0.65)"); grad.addColorStop(1, "rgba(214,178,124,0)");
+  mx.fillStyle = grad; mx.beginPath(); mx.moveTo(u, v); mx.arc(u, v, L, dir - half, dir + half); mx.closePath(); mx.fill();
+  mx.fillStyle = "#d6b27c"; mx.strokeStyle = "#121413"; mx.lineWidth = 3; mx.beginPath(); mx.arc(u, v, 6.5, 0, 7); mx.fill(); mx.stroke();
+}
+map.addEventListener("click", (e) => {
+  const r = map.getBoundingClientRect();
+  const [x, z] = fromMap((e.clientX - r.left) * map.width / r.width, (e.clientY - r.top) * map.height / r.height);
+  if (blocked(x, z)) { setStatus("That spot is inside a wall or a piece of furniture."); setTimeout(() => setStatus(photoOn ? $("status").textContent : ""), 2200); return; }
+  stopTour(); if (mode !== "walk") setMode("walk", true);
+  glideTo([x, floorAt(x, z) + EYE, z], { yaw, pitch: 0 }, 1.6);
+});
+
+// ---------- loop ----------
+let dirty = true, last = performance.now();
+function markDirty() { dirty = true; }
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); composer.setSize(w, h);
+  camera.aspect = w / h; camera.updateProjectionMatrix(); markDirty();
+}
+addEventListener("resize", resize);
+let camKey = "";
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (mode === "walk") {
+    if (glide) {
+      const t = Math.min(1, (now - glide.t0) / glide.dur), e = ease(t);
+      camera.position.lerpVectors(glide.p0, glide.p1, e);
+      yaw = glide.y0 + (glide.y1 - glide.y0) * e; pitch = glide.q0 + (glide.q1 - glide.q0) * e;
+      applyLook(); markDirty();
+      if (t >= 1) glide = null;
+    }
+    if (keys.size) {
+      const sp = (keys.has("ShiftLeft") || keys.has("ShiftRight") ? 2.6 : 1.35) * dt;
+      const fwd = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+      const side = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+      const turn = (keys.has("ArrowLeft") || keys.has("KeyQ") ? 1 : 0) - (keys.has("ArrowRight") || keys.has("KeyE") ? 1 : 0);
+      if (turn) { yaw += turn * 1.6 * dt; applyLook(); markDirty(); }
+      if (fwd || side) stepBy(fwd * sp, side * sp);
+      const ty = floorAt(camera.position.x, camera.position.z) + EYE;
+      camera.position.y += (ty - camera.position.y) * Math.min(1, dt * 6);
+    }
+    updateRoomCard();
+  } else orbit.update();
+  const key = camera.position.toArray().map((v) => v.toFixed(4)).join() + camera.quaternion.toArray().map((v) => v.toFixed(4)).join() + camera.fov;
+  if (photoOn && pt) {
+    if (key !== camKey) { pt.updateCamera(); }
+    camKey = key;
+    pt.renderSample();
+    const n = Math.floor(pt.samples);
+    setStatus(n < 2 ? "Path tracing… hold still" : `Photo · ${n} samples${n < 60 ? " · refining" : ""}`);
+    drawMap();
+    return;
+  }
+  camKey = key;
+  if (!dirty) return;
+  dirty = false;
+  composer.render();
+  drawMap();
+}
+
+// ---------- boot ----------
+const loadMsg = (t) => { $("loadMsg").textContent = t; };
+const bytes = Uint8Array.from(atob(GLB), (c) => c.charCodeAt(0));
+new GLTFLoader().parse(bytes.buffer, "", async (gltf) => {
+  dressModel(gltf.scene);
+  world.add(gltf.scene);
+  const walls = gltf.scene.getObjectByName("walls");
+  const box = new THREE.Box3().setFromObject(walls ?? gltf.scene);
+  CENTER.set((box.min.x + box.max.x) / 2, 0, (box.min.z + box.max.z) / 2);
+  addSurroundings(box);
+  loadMsg(`Furnishing ${ITEMS.length} pieces…`);
+  await new Promise((r) => setTimeout(r, 20));
+  buildFurniture();
+  furnRoot.traverse((o) => { if (o.isMesh && o.material && !o.material.transparent) o.receiveShadow = true; });
+  collectFurnBoxes();
+  drawMapBase();
+  renderStops();
+  resize();
+  setClock(8.5);
+  const s = STOPS[0]; camera.position.set(...s.pos); ({ yaw, pitch } = lookAngles(s.pos, s.tgt)); applyLook(); markStop(0);
+  updateRoomCard(true);
+  requestAnimationFrame(frame);
+  setTimeout(() => $("loader").classList.add("gone"), 150);
+  if (touch) $("help").textContent = "Drag to look · tap the floor to walk · two fingers to step";
+  setTimeout(() => { $("help").style.opacity = "0"; }, 9000);
+}, (e) => loadMsg("The model could not be loaded: " + e.message));
+</script>
