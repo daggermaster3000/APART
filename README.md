@@ -126,6 +126,12 @@ where you stand, the real sun path for Zurich on 8 October (morning, midday, gol
 a dollhouse view, and **Photo** mode, which path-traces the current view with
 [three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer) and refines while you hold still.
 
+Rendering techniques follow the [shader-dev skill](https://github.com/MiniMax-AI/skills/tree/main/skills/shader-dev):
+a physical sky (Rayleigh, Mie and ozone single scattering, rendered on the GPU into the environment map) with
+sunlight coloured by its transmittance through the atmosphere; volumetric sun shafts ray-marched through the sun's
+shadow map (dusty indoor air, nearly clear outside); bloom; an ACES, grade, S-curve, vignette, chromatic-aberration,
+film-grain and dither finish; fbm surface variation on walls, floors and lawn; and animated caustics in the aquarium.
+
 Build it with `python3 build_visit.py`. The furniture code is copied from `viewer_template.html`, so pieces look
 exactly as in the planner; their positions come from `visit/items.json`, a snapshot of the planner's shared layout.
 
