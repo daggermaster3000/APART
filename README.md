@@ -25,6 +25,10 @@ shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, or a pla
   POÄNG, EKEDALEN, LACK, MICKE, HEMNES, BRIMNES, BILLY, KALLAX, PAX); sizes written in the link
   (e.g. `160x200`); an estimate from Claude when the page runs inside claude.ai; or a typical size for
   the shape. The source is shown on each item; every size can be edited.
+- **L-shaped sofas.** Chaise longue / Récamière / méridienne and corner sofas (Ecksofa, canapé d'angle) are
+  recognised in English, German and French links. Set the *L-section depth* and side; under *Style → L-section*
+  choose *Chaise* (long seat with an arm along its side) or *Corner* (a seated return with its own back and an
+  end arm). German and French slugs (`4er-sofa-mit-recamiere`, `grau`, `eiche`, …) are translated before matching.
 - **Grid.** Off / 5 / 10 / 25 cm. Footprint edges snap to grid lines aligned with the living room's
   walls, and optionally flush against the nearest wall.
 - **Fit check.** Each item reports *Fits*, *Hits a wall*, *Hits a fixture* (kitchen, bath, WC, washer)

@@ -251,8 +251,8 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
             <input type="number" id="dElev" min="0" max="250" step="1"></label>
         </div>
         <div class="row2" id="dChaiseRow">
-          <label class="field" style="flex:1">Chaise depth cm <input type="number" id="dCD" min="0" max="300" step="1"></label>
-          <label class="field" style="flex:1">Chaise side
+          <label class="field" style="flex:1">L-section depth cm <input type="number" id="dCD" min="0" max="300" step="1"></label>
+          <label class="field" style="flex:1">L-section side
             <select id="dCS"><option value="right">Right, seen from the front</option><option value="left">Left, seen from the front</option></select></label>
         </div>
         <details class="style" id="dMeasBox"><summary>Measurements</summary>
@@ -635,6 +635,8 @@ const CATALOG = [
     meas: { seatHeight: 48, seatDepth: 55, armWidth: 22, armHeight: 54, backHeight: 68, legHeight: 6 } },
   { re: /vimle.*3-seat-sofa-with-chaise-longue/, type: "sofa", w: 252, d: 98, h: 83, chaise: 164, style: { material: "fabric", legs: "block", legHeight: 3, arms: "wide", back: "loose-cushions", seatCushions: 3 },
     meas: { seatHeight: 48, seatDepth: 55, armWidth: 22, armHeight: 54, backHeight: 68, legHeight: 6 } },
+  { re: /kivik.*4-seat-sofa-with-chaise-longue/, type: "sofa", w: 318, d: 95, h: 83, chaise: 163, style: { material: "fabric", legs: "block", legHeight: 4, arms: "wide", back: "loose-cushions", seatCushions: 4, lsection: "chaise" },
+    meas: { seatHeight: 45, seatDepth: 60 } },
   { re: /kivik.*3-seat-sofa(?!-with)/, type: "sofa", w: 228, d: 95, h: 83, style: { material: "fabric", legs: "block", legHeight: 4, arms: "wide", back: "loose-cushions", seatCushions: 3 },
     meas: { seatHeight: 45, seatDepth: 60 } },
   { re: /malm.*bed-frame-high/, type: "bed", w: 176, d: 209, h: 100, note: "Size for the 160×200 cm mattress version.", style: { material: "wood", headboard: "panel", legs: "plinth" },
@@ -717,6 +719,22 @@ const COLOURS = [
   ["turquoise", "#4a9a98"], ["natural", "#d8c3a0"], ["anthracite", "#3c3e41"],
 ];
 
+// German / French product words -> the English slug words the catalogue and shape rules use
+const SLUG_WORDS = [
+  [/(\d)er-(sofa|sitzer)/g, "$1-seat-$2"], [/(\d)-sitzer/g, "$1-seat"], [/(\d)-places/g, "$1-seat"], [/canape-(\d)-seat/g, "$1-seat-sofa"],
+  [/(^|-)(mit|avec)-(recamiere|meridienne)(?=-|$)/g, "$1with-chaise-longue"], [/(^|-)(recamiere|meridienne)(?=-|$)/g, "$1chaise-longue"],
+  [/(^|-)(ecksofa|eckcouch|canape-d-angle|canape-angle)(?=-|$)/g, "$1corner-sofa"], [/(^|-)(sofa|canape)-(mit|avec)-/g, "$1sofa-with-"],
+  [/(^|-)canape(?=-|$)/g, "$1sofa"], [/(^|-)sessel(?=-|$)/g, "$1armchair"], [/(^|-)fauteuil(?=-|$)/g, "$1armchair"],
+  [/(^|-)dunkelgrau(?=-|$)/g, "$1dark-grey"], [/(^|-)hellgrau(?=-|$)/g, "$1light-grey"], [/(^|-)(grau|gris)(?=-|$)/g, "$1grey"],
+  [/(^|-)(schwarz|noir)(?=-|$)/g, "$1black"], [/(^|-)(weiss|blanc)(?=-|$)/g, "$1white"], [/(^|-)(braun|brun)(?=-|$)/g, "$1brown"],
+  [/(^|-)(gruen|grun|vert)(?=-|$)/g, "$1green"], [/(^|-)(blau|bleu)(?=-|$)/g, "$1blue"], [/(^|-)(rot|rouge)(?=-|$)/g, "$1red"],
+  [/(^|-)(eiche|chene)(?=-|$)/g, "$1oak"], [/(^|-)(birke|bouleau)(?=-|$)/g, "$1birch"], [/(^|-)(kiefer|pin)(?=-|$)/g, "$1pine"],
+  [/(^|-)(nussbaum|noyer)(?=-|$)/g, "$1walnut"],
+];
+const canonSlug = (slug) => SLUG_WORDS.reduce((t, [re, to]) => t.replace(re, to), slug);
+// corner/chaise sofas: depth of the L-section when the link names one but gives no number
+const chaiseGuess = (slug) => /corner-sofa/.test(slug) ? 200 : /chaise/.test(slug) ? 160 : 0;
+
 function parseIkeaUrl(text) {
   let u;
   try { u = new URL(text.trim()); } catch { return null; }
@@ -726,7 +744,7 @@ function parseIkeaUrl(text) {
   const raw = decodeURIComponent((pi >= 0 ? segs[pi + 1] : segs.at(-1)) || "").toLowerCase();
   if (!raw) return null;
   const m = raw.match(/^(.*?)-?(s?\d{8})$/);
-  const slug = (m ? m[1] : raw).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const slug = canonSlug((m ? m[1] : raw).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ß/g, "ss"));
   const article = m ? m[2] : null;
   const words = slug.split("-");
   const family = words[0].toUpperCase();
@@ -758,6 +776,11 @@ function lookupSize(p) {
   const hit = CATALOG.find((c) => c.re.test(p.slug));
   if (hit && !/\d+x\d+/.test(p.slug.replace(/160x200/, "")))
     return { type: hit.type, w: hit.w, d: hit.d, h: hit.h, chaise: hit.chaise ?? 0, src: "catalog", note: hit.note ?? "" };
+  if (/corner-sofa/.test(p.slug) && !hit) {
+    const hint = SIZE_HINTS.find(([re]) => re.test(p.slug));
+    const [w, d, h] = hint ? hint[1] : [250, 95, 83];
+    return { type: "sofa", w, d, h, chaise: chaiseGuess(p.slug), src: "typical", note: "Corner sofa: check width and L-section depth." };
+  }
   const type = hit?.type ?? shapeFromSlug(p.slug);
   const nums = p.slug.match(/(\d{2,3})x(\d{2,3})(?:x(\d{2,3}))?/);
   if (nums) {
@@ -767,12 +790,12 @@ function lookupSize(p) {
     else if (c) { [w, d, h] = [a, b, c]; }
     else if (type === "shelving" || type === "storage") { [w, d, h] = [a, SHAPES[type].def[1], b]; }
     else { [w, d, h] = [a, b, SHAPES[type].def[2]]; }
-    return { type, w, d, h, chaise: /chaise/.test(p.slug) ? 160 : 0, src: "link",
+    return { type, w, d, h, chaise: chaiseGuess(p.slug), src: "link",
       note: type === "bed" ? `Mattress ${a}×${b} cm; frame size estimated around it.` : "" };
   }
   const hint = SIZE_HINTS.find(([re]) => re.test(p.slug));
   const [w, d, h] = hint ? hint[1] : SHAPES[type].def;
-  return { type, w, d, h, chaise: /chaise/.test(p.slug) ? 160 : 0, src: "typical", note: "" };
+  return { type, w, d, h, chaise: chaiseGuess(p.slug), src: "typical", note: "" };
 }
 
 let samplePromise = null;
@@ -790,6 +813,7 @@ Product page: ${p.url}
 From the link: ${p.family}, ${p.desc}. Article number ${fmtArticle(p.article) || "unknown"}.
 You cannot open the page. From what you know about this IKEA product, give its overall assembled size in centimetres.
 width = side to side seen from the front; depth = front to back (for beds: the total length); height = overall height.
+For an L-shaped sofa (chaise longue / Récamière / méridienne, or a corner sofa) width is the long side, depth the main seat depth, and chaise_depth_cm the depth of the L-section.
 Reply with only this JSON:
 {"shape": one of ${JSON.stringify(Object.keys(SHAPES))}, "width_cm": number, "depth_cm": number, "height_cm": number,
  "chaise_depth_cm": number or null, "confident": true if you know this exact product's listed measurements, else false,
@@ -827,10 +851,11 @@ const STYLE_OPTIONS = {
   shade: ["dome", "cone", "drum", "globe", "bell"],
   profile: ["auto", "vase-tall", "vase-round", "bottle", "cylinder", "bowl", "frame"],
   foliage: ["leafy", "upright", "bushy"],
+  lsection: ["chaise", "corner"],
 };
 // which style fields matter for which shape
 const STYLE_FIELDS = {
-  sofa: ["material", "legs", "legHeight", "arms", "back", "seatCushions"],
+  sofa: ["material", "legs", "legHeight", "arms", "back", "seatCushions", "lsection"],
   armchair: ["material", "legs", "legHeight", "arms", "back"],
   bed: ["material", "headboard", "legs", "legHeight"],
   table: ["material", "top", "legs", "topThick"], desk: ["material", "top", "legs", "topThick"],
@@ -864,7 +889,8 @@ function measOf(it) {
 const cm = (v) => (Number.isFinite(v) && v > 0 ? v / 100 : undefined);
 function styleOf(it) {
   const preset = CATALOG.find((c) => c.re.test(it.slug ?? ""))?.style;
-  return { ...(TYPE_STYLE[it.type] ?? {}), ...(preset ?? {}), ...(it.style ?? {}) };
+  const slugDefault = it.type === "sofa" ? { lsection: /corner-sofa/.test(it.slug ?? "") ? "corner" : "chaise" } : {};
+  return { ...(TYPE_STYLE[it.type] ?? {}), ...slugDefault, ...(preset ?? {}), ...(it.style ?? {}) };
 }
 
 // grayscale tile textures, tinted by each material's colour
@@ -981,34 +1007,70 @@ function buildSofa(g, it, mats, st) {
   if (legH > 0) legSet(g, lm, st, w, d, legH, 0.045, 0.06, (z0 + zf) / 2);
   else blk(g, mats.dark, -w / 2 + 0.03, w / 2 - 0.03, 0, 0.03, z0 + 0.03, zf - 0.03);
   blk(g, main, -w / 2 + a * 0.5, w / 2 - a * 0.5, Math.max(legH, 0.03), baseTop, z0, zf, 0.02);
-  // seat cushions
-  const inner = w - 2 * a;
+  // L-section: "chaise" = long seat with an arm along its side; "corner" = a seated return with its own back
+  const hasL = it.chaise / 100 > d + 0.05 && !armchair;
+  const s = it.chaiseSide === "left" ? -1 : 1;
+  const corner = hasL && st.lsection === "corner";
+  // seat cushions (on a corner sofa they run into the corner, up to the return's back)
+  const xL = -w / 2 + (corner && s < 0 ? backD : a), xR = w / 2 - (corner && s > 0 ? backD : a);
+  const inner = xR - xL;
   const n = Math.max(1, Math.min(6, st.seatCushions || Math.round(inner / (armchair ? 1 : 0.68))));
   for (let k = 0; k < n; k++) {
-    const x0 = -w / 2 + a + inner * k / n, x1 = -w / 2 + a + inner * (k + 1) / n;
+    const x0 = xL + inner * k / n, x1 = xL + inner * (k + 1) / n;
     blk(g, cush, x0 + 0.005, x1 - 0.005, baseTop, seatTop, z0 + backD, zf, R);
   }
   // back
   const backTop = st.back === "low" ? h * 0.82 : h;
+  const backH = Math.min(backTop, cm(m.backHeight) ?? backTop * 0.86);
   if (st.back === "loose-cushions") {
-    blk(g, main, -w / 2 + a * 0.5, w / 2 - a * 0.5, baseTop, Math.min(backTop, cm(m.backHeight) ?? backTop * 0.86), z0, z0 + backD, 0.02);
+    blk(g, main, -w / 2 + (corner && s < 0 ? 0 : a * 0.5), w / 2 - (corner && s > 0 ? 0 : a * 0.5), baseTop, backH, z0, z0 + backD, 0.02);
     for (let k = 0; k < n; k++) {
-      const x0 = -w / 2 + a + inner * k / n, x1 = -w / 2 + a + inner * (k + 1) / n;
+      const x0 = xL + inner * k / n, x1 = xL + inner * (k + 1) / n;
       const c = blk(g, cush, x0 + 0.01, x1 - 0.01, seatTop - 0.02, backTop, z0 + backD - 0.02, z0 + backD + 0.17, 0.06);
       if (c) { c.rotation.x = -0.12; c.position.z -= 0.015; }
     }
   } else {
-    blk(g, main, -w / 2 + a * 0.5, w / 2 - a * 0.5, baseTop, backTop, z0, z0 + backD, R);
+    blk(g, main, -w / 2 + (corner && s < 0 ? 0 : a * 0.5), w / 2 - (corner && s > 0 ? 0 : a * 0.5), baseTop, backTop, z0, z0 + backD, R);
   }
   if (st.back === "wing") for (const sx of [-1, 1]) blk(g, main, sx > 0 ? w / 2 - a : -w / 2, sx > 0 ? w / 2 : -w / 2 + a, armTop, backTop - 0.02, z0, z0 + Math.min(0.32, d * 0.4), 0.04);
   const rects = [[-w / 2, z0, w / 2, zf]];
   const arm = (x0, x1, za, zb) => {
     if (a <= 0) return;
     blk(g, main, x0, x1, Math.max(legH, 0.03), armTop, za, zb, R);
-    if (st.arms === "rolled") { const r = cyl(g, main, (x0 + x1) / 2, (za + zb) / 2, 0, zb - za, a * 0.62, a * 0.62, 20); r.rotation.x = Math.PI / 2; r.position.y = armTop; }
+    if (st.arms === "rolled") {
+      const across = x1 - x0 > zb - za; // an end arm runs side to side
+      const r = cyl(g, main, (x0 + x1) / 2, (za + zb) / 2, 0, across ? x1 - x0 : zb - za, a * 0.62, a * 0.62, 20);
+      if (across) r.rotation.z = Math.PI / 2; else r.rotation.x = Math.PI / 2;
+      r.position.y = armTop;
+    }
   };
-  if (it.chaise / 100 > d + 0.05 && !armchair) {
-    const s = it.chaiseSide === "left" ? -1 : 1;
+  if (corner) {
+    // seated return: as deep as the main seat, back along its outer side, arm across its far end
+    const cw = Math.min(d, w * 0.45), zEnd = z0 + D;
+    const xa = s > 0 ? w / 2 - cw : -w / 2, xb = s > 0 ? w / 2 : -w / 2 + cw;
+    if (legH > 0) for (const sx of [xa + 0.06, xb - 0.06]) leg(g, lm, st, sx, zEnd - 0.06, legH, 0.045);
+    blk(g, main, xa, xb, Math.max(legH, 0.03), baseTop, zf - 0.02, zEnd, 0.02);
+    const ba = s > 0 ? xb - backD : xa, bb = s > 0 ? xb : xa + backD;          // outer back
+    const ia = s > 0 ? xa : xa + backD, ib = s > 0 ? xb - backD : xb;          // seat between back and inner edge
+    const za = z0 + backD, zb = zEnd - a, len = zb - za;
+    if (st.back === "loose-cushions") {
+      blk(g, main, ba, bb, baseTop, backH, z0 + backD, zEnd - a * 0.5, 0.02);
+      const nb = Math.max(1, Math.round((len - (zf - za)) / 0.68));
+      for (let k = 0; k < nb; k++) {
+        const c0 = zf + (zb - zf) * k / nb, c1 = zf + (zb - zf) * (k + 1) / nb;
+        const c = blk(g, cush, s > 0 ? ba - 0.17 : bb - 0.02, s > 0 ? ba + 0.02 : bb + 0.17, seatTop - 0.02, backTop, c0 + 0.01, c1 - 0.01, 0.06);
+        if (c) { c.rotation.z = -0.12 * s; c.position.x += 0.015 * s; } // lean back, away from the seat
+      }
+    } else blk(g, main, ba, bb, baseTop, backTop, z0 + backD, zEnd - a * 0.5, R);
+    const nr = Math.max(1, Math.round((zb - zf) / 0.68));
+    for (let k = 0; k < nr; k++) {
+      const c0 = zf + (zb - zf) * k / nr, c1 = zf + (zb - zf) * (k + 1) / nr;
+      blk(g, cush, ia + 0.005, ib - 0.005, baseTop, seatTop, c0 + 0.005, c1 - 0.005, R);
+    }
+    rects.push([xa, zf, xb, zEnd]);
+    arm(xa, xb, zEnd - a, zEnd);                                                 // end arm, turned 90°
+    if (s > 0) arm(-w / 2, -w / 2 + a, z0, zf); else arm(w / 2 - a, w / 2, z0, zf);
+  } else if (hasL) {
     const cw = Math.min(0.98, w * 0.42);
     const xa = s > 0 ? w / 2 - cw : -w / 2, xb = s > 0 ? w / 2 : -w / 2 + cw;
     if (legH > 0) for (const sx of [xa + 0.06, xb - 0.06]) leg(g, lm, st, sx, z0 + D - 0.06, legH, 0.045);
@@ -1860,7 +1922,7 @@ function setSrcChip(src, note) {
   $("dNote").textContent = note ?? "";
 }
 // ---- style controls (filled from the photo, a catalogue preset or by hand)
-const STYLE_LABELS = { material: "Material", legs: "Legs", legHeight: "Leg height cm", arms: "Arms", back: "Back", seatCushions: "Seat cushions",
+const STYLE_LABELS = { material: "Material", legs: "Legs", legHeight: "Leg height cm", arms: "Arms", back: "Back", seatCushions: "Seat cushions", lsection: "L-section",
   headboard: "Headboard", top: "Top", topThick: "Top thickness cm", fronts: "Fronts", handles: "Handles", shade: "Shade", profile: "Shape", foliage: "Foliage" };
 const NUMERIC = { legHeight: [0, 60], topThick: [1, 15], seatCushions: [1, 6] };
 const pretty = (v) => String(v).replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
