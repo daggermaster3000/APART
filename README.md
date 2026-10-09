@@ -128,7 +128,13 @@ a dollhouse view, and **Photo** mode, which path-traces the current view with
 
 **Guided tour** walks the visitor through eleven stops along real doorways at walking pace, with narration,
 a progress bar, pause/next/end controls, and the sun moving from 08:30 to an evening finale with the lamps on.
-At the library wall, every time, something unexpected happens (typing `banana` anywhere has the same effect).
+The flat's seven monkeys live in the Reduit; at the library wall they burst out, and one of them takes a book
+from the BILLY wall and reads in the STRANDMON for the rest of the tour (typing `banana` lets them out any time).
+
+The surroundings are traced from an aerial photo of Lehmgrubenstrasse 8 (0.204 m per pixel): paths and
+Ahornallee, the car park, fields and sand pit, the allotments, the terraced houses to the east, the new blocks
+and the crane to the south-east, and the forest along the south. The photo puts the garden on the south side,
+so the walkthrough's compass (and sun path) is turned 90° from the brochure reading the planner still uses.
 
 Rendering techniques follow the [shader-dev skill](https://github.com/MiniMax-AI/skills/tree/main/skills/shader-dev):
 a physical sky (Rayleigh, Mie and ozone single scattering, rendered on the GPU into the environment map) with

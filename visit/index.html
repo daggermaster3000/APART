@@ -20,6 +20,7 @@
   color-scheme: dark;
 }
 html, body { height: 100%; }
+[hidden] { display: none !important; }
 body { background: var(--night); color: var(--chalk); font-family: var(--f-body); font-size: 14px; overflow: hidden; }
 #stage { position: fixed; inset: 0; }
 #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; outline: none; }
@@ -136,7 +137,7 @@ body.guided #bar, body.guided #help { display: none; }
 
 <aside id="mapWrap" class="panel" aria-label="Plan">
   <canvas id="map" width="420" height="560" aria-label="Plan of the apartment. Click to walk there."></canvas>
-  <div class="mapcap"><span>N ←</span><span>1 : 200</span></div>
+  <div class="mapcap"><span>N ↓</span><span>1 : 200</span></div>
 </aside>
 
 <div id="bar">
@@ -1061,8 +1062,8 @@ function sunAt(clock) {
   const sinEl = Math.sin(LAT) * Math.sin(DECL) + Math.cos(LAT) * Math.cos(DECL) * Math.cos(H);
   const az = Math.PI + Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(LAT) - Math.tan(DECL) * Math.cos(LAT)); // from north, clockwise
   const el = Math.asin(sinEl);
-  // plan axes: north = -x, east = -z, south = +x, west = +z
-  return { el, az, dir: new THREE.Vector3(-Math.cos(az) * Math.cos(el), Math.sin(el), -Math.sin(az) * Math.cos(el)).normalize() };
+  // plan axes, aligned to the aerial photo: north = +z, east = -x, south = -z, west = +x
+  return { el, az, dir: new THREE.Vector3(-Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).normalize() };
 }
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -1418,7 +1419,168 @@ function addSurroundings(box) {
   const leaf = plainMat({ color: 0x3e5a32, roughness: 0.9, map: TX.lawn });
   const hedge = (ax, az, bx, bz) => { const h = new THREE.Mesh(new RoundedBoxGeometry(Math.max(0.7, bx - ax), 1.7, Math.max(0.7, bz - az), 3, 0.25), leaf);
     h.position.set((ax + bx) / 2, -0.18 + 0.85, (az + bz) / 2); h.castShadow = h.receiveShadow = true; world.add(h); };
-  hedge(3.2, -7.4, 16.2, -6.7); hedge(15.5, -7.4, 16.2, -0.2); hedge(3.2, -7.4, 3.9, -0.2); hedge(15.6, 12.9, 16.3, 17.2); hedge(10.6, 16.9, 16.3, 17.6);
+  hedge(3.2, -7.4, 16.2, -6.7); hedge(15.5, -7.4, 16.2, -0.2); hedge(3.2, -7.4, 3.9, -0.2); hedge(15.6, 12.9, 16.3, 16.8);
+}
+
+
+// =====================================================================
+// The neighbourhood, traced from the aerial photo of Lehmgrubenstrasse 8.
+// Photo pixels (u right = east, v down = south) map to the plan at 0.204 m/px:
+// the building's east edge (u 400) is x = 0, the garden facade (v 298) is z = 0.
+// =====================================================================
+const solidBoxes = [], photoHide = [];
+const AER = { s: 0.204, u0: 400, v0: 298, W: 724, H: 828 };
+const A = (u, v) => [(AER.u0 - u) * AER.s, (AER.v0 - v) * AER.s];   // photo px -> plan x, z
+function paintGround() {
+  const K = 2.5, c = document.createElement("canvas"); c.width = AER.W * K; c.height = AER.H * K;
+  const x = c.getContext("2d"); x.scale(K, K);
+  seed = 21;
+  const poly = (pts, fill) => { x.beginPath(); pts.forEach(([u, v], i) => (i ? x.lineTo(u, v) : x.moveTo(u, v))); x.closePath(); x.fillStyle = fill; x.fill(); };
+  const line = (pts, w, col) => { x.beginPath(); pts.forEach(([u, v], i) => (i ? x.lineTo(u, v) : x.moveTo(u, v))); x.lineWidth = w; x.lineJoin = x.lineCap = "round"; x.strokeStyle = col; x.stroke(); };
+  const speckle = (u0, v0, u1, v1, n, cols, r = 1.6) => { for (let i = 0; i < n; i++) { x.fillStyle = cols[Math.floor(rnd() * cols.length)]; x.beginPath(); x.arc(u0 + rnd() * (u1 - u0), v0 + rnd() * (v1 - v0), r * (0.4 + rnd()), 0, 7); x.fill(); } };
+  x.fillStyle = "#6f8b4b"; x.fillRect(0, 0, AER.W, AER.H);                                  // meadow
+  speckle(0, 0, AER.W, AER.H, 9000, ["rgba(90,120,60,.35)", "rgba(130,150,80,.3)", "rgba(70,95,45,.3)"]);
+  poly([[0, 450], [400, 445], [402, 630], [0, 628]], "#4f7d37");                            // the big field to the south-west
+  for (let v = 455; v < 628; v += 9) line([[0, v], [400, v - 2]], 3.5, "rgba(95,140,70,.35)");  // mowing stripes
+  poly([[130, 215], [280, 205], [290, 300], [285, 430], [140, 440]], "#5e8f3d");             // field north-west
+  poly([[50, 262], [140, 255], [142, 420], [60, 425]], "#c7b289");                         // sand pit
+  speckle(50, 262, 140, 420, 500, ["rgba(150,130,95,.5)", "rgba(220,205,170,.5)"]);
+  poly([[150, 150], [280, 145], [290, 230], [155, 235]], "#c9c5bb");                         // gravel car park
+  poly([[200, 0], [380, 0], [385, 150], [300, 160], [200, 120]], "#b9ad96");                  // building site to the north
+  poly([[410, 450], [570, 448], [575, 640], [412, 642]], "#c3a97b");                          // building site to the south-east
+  speckle(410, 450, 575, 640, 900, ["rgba(170,140,95,.5)", "rgba(215,195,150,.5)", "rgba(120,110,95,.4)"]);
+  x.save(); x.beginPath(); x.ellipse(437, 372, 88, 52, -0.08, 0, 7); x.fillStyle = "#6b7d45"; x.fill(); x.clip();      // allotments
+  for (let i = 0; i < 26; i++) { x.fillStyle = ["#8a7a52", "#5d7a3a", "#7b8f4c", "#9a8660"][i % 4]; x.fillRect(350 + (i % 9) * 19 + rnd() * 3, 320 + Math.floor(i / 9) * 33 + rnd() * 4, 15, 26); }
+  x.restore();
+  poly([[440, 0], [724, 0], [724, 290], [430, 300]], "#7b9a57");                              // gardens of the terraced houses
+  poly([[0, 628], [724, 640], [724, 828], [0, 828]], "#2e4126");                              // forest floor
+  const PATH = "#cfcbc1", ROAD = "#bdb9b0";
+  line([[0, 25], [120, 80], [210, 125], [300, 165], [335, 180]], 17, ROAD);                    // Ahornallee
+  line([[335, 180], [400, 180], [412, 150], [415, 0]], 14, ROAD);
+  line([[412, 180], [412, 300]], 17, ROAD);                                                     // the lane east of the house
+  line([[412, 300], [560, 298], [724, 290]], 13, PATH);
+  line([[300, 343], [360, 336], [412, 312]], 11, PATH);                                         // along the garden hedge
+  line([[285, 195], [286, 300], [295, 380], [300, 410]], 13, PATH);
+  line([[300, 410], [340, 415], [380, 430], [420, 445], [520, 445], [565, 440]], 15, PATH);
+  line([[300, 410], [250, 428], [150, 445], [0, 437]], 13, PATH);
+  line([[405, 445], [405, 642]], 9, PATH);
+  line([[280, 200], [300, 190]], 12, PATH);
+  for (const [u, v] of [[205, 175], [220, 182], [236, 186], [252, 190]]) { x.fillStyle = "#e7e5e0"; x.fillRect(u, v, 5, 9); } // parked cars, as seen from above
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+function roofTex(kind) {
+  return canvasTex(256, (x, s) => {
+    seed = kind === "solar" ? 31 : 37;
+    x.fillStyle = { solar: "#2c3138", tile: "#8a4b3a", flat: "#9a9c9d", site: "#b9b6ae" }[kind]; x.fillRect(0, 0, s, s);
+    if (kind === "solar") for (let j = 0; j < 8; j++) for (let i = 0; i < 5; i++) { x.fillStyle = "#1f2a3c"; x.fillRect(i * 51 + 3, j * 32 + 2, 46, 28); x.fillStyle = "rgba(120,150,190,.18)"; x.fillRect(i * 51 + 3, j * 32 + 2, 46, 6); }
+    if (kind === "tile") for (let j = 0; j < s; j += 8) { x.fillStyle = "rgba(0,0,0,.15)"; x.fillRect(0, j, s, 2); }
+    if (kind === "site") { x.strokeStyle = "rgba(60,60,60,.5)"; for (let i = 0; i < s; i += 32) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, s); x.moveTo(0, i); x.lineTo(s, i); x.stroke(); } }
+    noise(x, s, 10);
+  });
+}
+const nbMats = {};
+function nbMat(kind) {
+  if (nbMats[kind]) return nbMats[kind];
+  const facade = (col) => plainMat({ map: TX.facade, color: col, roughness: 0.9 });
+  return (nbMats[kind] = {
+    wallLight: () => facade(0xffffff), wallWarm: () => facade(0xf1e6d6), wallGrey: () => facade(0xd9dadb),
+    scaffold: () => plainMat({ map: roofTex("site"), roughness: 0.95, color: 0xd8d4cb }),
+    solar: () => plainMat({ map: roofTex("solar"), roughness: 0.35, metalness: 0.2 }), tile: () => plainMat({ map: roofTex("tile"), roughness: 0.8 }),
+    flat: () => plainMat({ map: roofTex("flat"), roughness: 0.9 }),
+  }[kind]());
+}
+// a block from photo-pixel corners; walls get the facade texture, the roof its own
+function block(u0, v0, u1, v1, h, wall, roof, pitch = 0) {
+  const [xa, za] = A(u0, v0), [xb, zb] = A(u1, v1);
+  const x0 = Math.min(xa, xb), x1 = Math.max(xa, xb), z0 = Math.min(za, zb), z1 = Math.max(za, zb);
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, h + 0.25, z1 - z0), nbMat(wall));
+  body.position.set((x0 + x1) / 2, (h - 0.25) / 2, (z0 + z1) / 2); worldUV(body, 6); g.add(body);
+  if (pitch) { // gable along the long side
+    const long = (x1 - x0) > (z1 - z0), span = long ? z1 - z0 : x1 - x0, len = long ? x1 - x0 : z1 - z0;
+    const sh = new THREE.Shape([new THREE.Vector2(-span / 2, 0), new THREE.Vector2(span / 2, 0), new THREE.Vector2(0, pitch)]);
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: len, bevelEnabled: false }); geo.translate(0, 0, -len / 2);
+    const r = new THREE.Mesh(geo, nbMat(roof)); r.position.set((x0 + x1) / 2, h, (z0 + z1) / 2); if (long) r.rotation.y = Math.PI / 2;
+    worldUV(r, 5); g.add(r);
+  } else {
+    const r = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 + 0.3, 0.3, z1 - z0 + 0.3), nbMat(roof));
+    r.position.set((x0 + x1) / 2, h + 0.15, (z0 + z1) / 2); worldUV(r, 5); g.add(r);
+  }
+  g.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = Math.hypot(o.position.x - CENTER.x, o.position.z - CENTER.z) < 35; } });
+  solidBoxes.push([x0, z0, x1, z1]);
+  world.add(g); return g;
+}
+function addNeighbourhood(box) {
+  // ground: the photo's layout repainted, a little below our own garden
+  const [gx0, gz0] = A(0, 0), [gx1, gz1] = A(AER.W, AER.H);
+  const geo = new THREE.PlaneGeometry(Math.abs(gx1 - gx0), Math.abs(gz1 - gz0), 1, 1);
+  const ground = new THREE.Mesh(geo, plainMat({ map: paintGround(), roughness: 0.95 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set((gx0 + gx1) / 2, -0.205, (gz0 + gz1) / 2);
+  ground.updateMatrixWorld(true);
+  const p = geo.attributes.position, uv = geo.attributes.uv, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(ground.matrixWorld); uv.setXY(i, (AER.u0 - v.x / AER.s) / AER.W, 1 - (AER.v0 - v.z / AER.s) / AER.H); }
+  ground.receiveShadow = true; world.add(ground); floorMeshes.push(ground);
+  // the rest of No. 8: the units north of ours, same height as the storeys above us (the north terrace stays open)
+  const top = INFO.wall_height_m + 9.4;
+  const rest = (x0, z0, x1, z1) => { const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, top + 0.2, z1 - z0), nbMat("wallLight"));
+    m.position.set((x0 + x1) / 2, top / 2 - 0.1, (z0 + z1) / 2); worldUV(m, 6); m.castShadow = m.receiveShadow = true; world.add(m); solidBoxes.push([x0, z0, x1, z1]); };
+  const zN = (AER.v0 - 188) * AER.s;
+  rest(box.min.x, box.max.z, 11.0, zN); rest(11.0, 16.9, box.max.x, zN);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(box.max.x - box.min.x + 0.4, 0.3, zN - box.min.z + 0.4), nbMat("solar"));
+  roof.position.set((box.min.x + box.max.x) / 2, top + 0.15, (box.min.z + zN) / 2); worldUV(roof, 5); world.add(roof);
+  // terraced houses to the east (solar roofs and red tiles, as in the photo)
+  block(458, 72, 500, 196, 7.2, "wallWarm", "solar", 2.6);
+  block(458, 0, 500, 22, 7.2, "wallWarm", "solar", 2.6);
+  block(583, 0, 627, 84, 7.2, "wallLight", "solar", 2.6);
+  block(583, 104, 627, 200, 7.2, "wallLight", "tile", 2.8);
+  block(680, 30, 724, 132, 7.2, "wallWarm", "solar", 2.6);
+  block(680, 172, 724, 266, 7.2, "wallLight", "tile", 2.8);
+  // new blocks to the south-east, one still under construction
+  block(575, 310, 636, 432, 15.5, "wallGrey", "flat");
+  block(576, 452, 646, 612, 10.5, "scaffold", "flat");
+  block(670, 305, 724, 600, 15.5, "wallLight", "flat");
+  block(150, 0, 305, 74, 12.5, "wallGrey", "flat");                                    // the block across Ahornallee
+  block(404, 338, 416, 352, 2.3, "wallWarm", "tile", 0.8);                              // allotment shed
+  // site cabins and the tower crane
+  const cabin = (u, v, col, rot = 0) => { const [cx, cz] = A(u, v); const m = new THREE.Mesh(new THREE.BoxGeometry(6, 2.6, 2.4), plainMat({ color: col, roughness: 0.6, metalness: 0.2 }));
+    m.position.set(cx, 1.1, cz); m.rotation.y = rot; m.castShadow = m.receiveShadow = true; world.add(m); };
+  cabin(430, 470, 0xd9dcdc); cabin(432, 484, 0xb8433a); cabin(520, 572, 0xe7e7e3, 1.57); cabin(505, 590, 0xd9dcdc, 1.57); cabin(470, 610, 0x8a3b33);
+  const [kx, kz] = A(548, 456), yellow = plainMat({ color: 0xe0b12a, roughness: 0.5, metalness: 0.3 }), red = plainMat({ color: 0xb8433a, roughness: 0.5, metalness: 0.3 });
+  const crane = new THREE.Group(); crane.position.set(kx, -0.2, kz); world.add(crane);
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(1.6, 34, 1.6), yellow); mast.position.y = 17; crane.add(mast);
+  const slew = new THREE.Group(); slew.position.y = 34; slew.rotation.y = 2.3; crane.add(slew);
+  const jib = new THREE.Mesh(new THREE.BoxGeometry(46, 1.2, 1.2), red); jib.position.x = 18; slew.add(jib);
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(12, 1.4, 2.4), yellow); counter.position.x = -8; slew.add(counter);
+  const weight = new THREE.Mesh(new THREE.BoxGeometry(3, 2.6, 2.6), plainMat({ color: 0x8c8c86, roughness: 0.9 })); weight.position.set(-12.5, -1.8, 0); slew.add(weight);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.4, 2.4), plainMat({ color: 0xf2f2ee, roughness: 0.4 })); cab.position.set(1.6, -1.6, 1.5); slew.add(cab);
+  const apex = new THREE.Mesh(new THREE.ConeGeometry(1.2, 7, 4), yellow); apex.position.y = 3.5; slew.add(apex);
+  const hook = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 18, 4), plainMat({ color: 0x222222 })); hook.position.set(30, -9, 0); slew.add(hook);
+  crane.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+  // trees: the forest along the south edge, a row along Ahornallee, a few around the houses
+  const spots = [];
+  for (let u = 0; u < AER.W; u += 7.5) for (let v = 632; v < AER.H; v += 7.5) spots.push([u + (rnd() - 0.5) * 6, v + (rnd() - 0.5) * 6 + (v < 640 ? rnd() * 10 : 0), 1]);
+  for (let u = 230; u < 395; u += 14) spots.push([u + rnd() * 5, 118 + rnd() * 30, 0.6]);
+  for (const [u, v] of [[310, 215], [312, 250], [318, 280], [520, 260], [540, 250], [650, 230], [650, 140], [540, 80], [560, 150], [740, 300], [690, 640], [620, 650], [430, 420], [480, 410]]) spots.push([u, v, 0.55]);
+  const crownGeo = new THREE.IcosahedronGeometry(1, 1), trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 1, 6);
+  const crowns = new THREE.InstancedMesh(crownGeo, plainMat({ roughness: 0.9, color: 0xffffff }), spots.length * 2);
+  const trunks = new THREE.InstancedMesh(trunkGeo, plainMat({ color: 0x4a3a2c, roughness: 1 }), spots.length);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
+  spots.forEach(([u, v, big], i) => {
+    const [x, z] = A(u, v), h = (6 + rnd() * 7) * big + 3, r = (2.4 + rnd() * 2.2) * Math.max(0.6, big);
+    m4.compose(new THREE.Vector3(x, h / 2 - 0.2, z), q, new THREE.Vector3(1, h, 1)); trunks.setMatrixAt(i, m4);
+    for (let k = 0; k < 2; k++) {
+      const rr = r * (k ? 0.75 : 1);
+      q.setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 3, 0));
+      m4.compose(new THREE.Vector3(x + (rnd() - 0.5) * r * 0.6, h + rr * (k ? 1.2 : 0.4), z + (rnd() - 0.5) * r * 0.6), q, new THREE.Vector3(rr, rr * (0.85 + rnd() * 0.3), rr));
+      crowns.setMatrixAt(i * 2 + k, m4);
+      col.setHSL(0.23 + rnd() * 0.08, 0.38 + rnd() * 0.18, 0.27 + rnd() * 0.13); crowns.setColorAt(i * 2 + k, col);
+    }
+    q.identity();
+  });
+  crowns.castShadow = trunks.castShadow = true; crowns.receiveShadow = true;
+  world.add(crowns, trunks); photoHide.push(crowns, trunks);
+  scene.fog = new THREE.FogExp2(0xc9d3dc, 0.0032);
 }
 
 // ---------- furniture ----------
@@ -1485,6 +1647,7 @@ function blocked(x, z) {
     for (let i = 0, j = o.r.length - 1; i < o.r.length; j = i++) if (segDist(x, z, o.r[j], o.r[i]) < R) return true;
   }
   for (const b of furnBoxes) if (x > b[0] - R * 0.6 && x < b[2] + R * 0.6 && z > b[1] - R * 0.6 && z < b[3] + R * 0.6) return true;
+  for (const b of solidBoxes) if (x > b[0] - R && x < b[2] + R && z > b[1] - R && z < b[3] + R) return true;
   return x < -6 || x > 26 || z < -14 || z > 24;
 }
 
@@ -1498,8 +1661,8 @@ const ROOM_NOTES = {
   "Reduit": "Storage room with the washer-dryer.",
 };
 function placeName(x, z) {
-  if (z < 0.05 && x > 3.9) return { name: "Garden · Sitzplatz E", note: "Lawn, two larch raised beds, a beer-garden table and the brewing corner.", area: INFO.terraces?.[0]?.plan_area_m2 };
-  if (z > 12.95) return { name: "Terrace · Sitzplatz W", note: "Small paved terrace for the evening sun.", area: INFO.terraces?.[1]?.plan_area_m2 };
+  if (z < 0.05 && x > 3.9) return { name: "South garden", note: "Lawn, two larch raised beds, a beer-garden table and the brewing corner. Fields and forest beyond the hedge.", area: INFO.terraces?.[0]?.plan_area_m2 };
+  if (z > 12.95) return { name: "North terrace", note: "Small paved terrace on the north-west corner, for the evening light.", area: INFO.terraces?.[1]?.plan_area_m2 };
   for (const r of INFO.rooms) { const [a, b, c, d] = r.bounds; if (x >= a - 0.08 && x <= c + 0.08 && z >= b - 0.08 && z <= d + 0.08) return { name: r.name, note: ROOM_NOTES[r.name] ?? "", area: r.plan_area_m2, dims: [c - a, d - b] }; }
   if (x < 4.2) return { name: "Treppenhaus", note: "Shared stairwell and lift.", area: INFO.shared?.[0]?.plan_area_m2 };
   return { name: "Outside", note: "" };
@@ -1578,9 +1741,9 @@ function stopTour() { if (guide && !guide.paused && !troop) setGuidePaused(true)
 const P = (x, z) => [x, z];
 const GUIDE = [
   { name: "Entrance hall", clock: 8.5, pos: [4.95, EYE, 5.7], tgt: [10.5, 1.15, 5.5], via: [],
-    text: "Welcome to L08.02, on the ground floor of Lemgrubenstrasse 8. The hall runs almost seven metres, with a shoe cabinet, an oak bench and a mirror by the door." },
+    text: "Welcome to L08.02, on the ground floor of Lehmgrubenstrasse 8: new terraced houses to the east, open fields and forest to the south. The hall runs almost seven metres, with a shoe cabinet, an oak bench and a mirror by the door." },
   { name: "Bedroom", clock: 9.0, pos: [5.45, EYE, 4.05], tgt: [7.4, 0.85, 1.2], via: [P(5.31, 5.35), P(5.31, 4.55)],
-    text: "Zimmer 1 faces the east garden, so the morning sun lands on the pine bed. White wardrobes along one wall, an oak dresser with a mirror opposite." },
+    text: "Zimmer 1 opens onto the south garden, so the sun reaches the pine bed by mid-morning. White wardrobes along one wall, an oak dresser with a mirror opposite." },
   { name: "Work and guest room", clock: 9.75, pos: [9.25, EYE, 4.2], tgt: [9.9, 1.0, 0.8], via: [P(5.31, 4.6), P(5.6, 5.3), P(7.3, 5.33), P(9.24, 5.45), P(9.24, 4.7)],
     text: "Zimmer 2 is the study: a daybed for guests, the desk under the window, and two SKÅDIS boards for everything that needs a hook." },
   { name: "The library wall", clock: 11.0, pos: [11.75, EYE, 8.25], tgt: [14.6, 1.1, 5.6], via: [P(9.24, 4.8), P(9.6, 5.65), P(11.3, 5.7), P(11.75, 7.2)],
@@ -1590,13 +1753,13 @@ const GUIDE = [
   { name: "Dining", clock: 13.0, pos: [11.55, EYE, 6.3], tgt: [13.9, 0.9, 1.4], via: [P(13.0, 7.2)],
     text: "The oak table seats six under two rattan domes, a step from the kitchen counter and the glass doors to the garden." },
   { name: "Kitchen garden", clock: 14.5, pos: [5.0, 1.45, -5.3], tgt: [11.2, 0.55, -1.8], via: [P(12.1, 5.0), P(12.1, 1.0), P(12.0, -0.8), P(8.5, -3.4)],
-    text: "Outside, 61 m² of lawn and paving. Two larch raised beds for vegetables and herbs, and a laurel hedge all round." },
+    text: "Outside, 61 m² of south-facing lawn and paving. Two larch raised beds for vegetables and herbs, a laurel hedge, and beyond it the path down past the fields to the forest." },
   { name: "Brewing corner", clock: 15.5, pos: [12.4, 1.5, -0.7], tgt: [14.8, 0.5, -4.2], via: [P(8.5, -3.0), P(11.0, -1.7)],
     text: "By the house wall, the brewing station: kettle on its gas burner, two fermenters and the bottle crates. The beer-garden table is right there." },
   { name: "Lounge", clock: 17.0, pos: [14.3, EYE, 8.95], tgt: [12.1, 0.7, 11.7], via: [P(12.1, -0.6), P(12.1, 1.0), P(12.1, 4.8), P(12.7, 6.4), P(13.7, 8.1)],
-    text: "Back inside for the late afternoon. The KIVIK sofa with its chaise looks west, towards the terrace and the evening sun." },
-  { name: "West terrace", clock: 18.1, pos: [12.9, 1.55, 13.55], tgt: [13.6, 0.4, 15.6], via: [P(14.0, 10.1), P(13.6, 12.0)],
-    text: "The small west terrace catches the last light of the day: a bistro table for two and olive trees in terracotta pots." },
+    text: "Back inside for the late afternoon. The KIVIK sofa with its chaise looks west, into the evening sun." },
+  { name: "North terrace", clock: 18.1, pos: [12.9, 1.55, 13.55], tgt: [13.6, 0.4, 15.6], via: [P(14.0, 10.1), P(13.6, 12.0)],
+    text: "The small terrace on the north-west corner catches the last light of the day: a bistro table for two and olive trees in terracotta pots." },
   { name: "Evening in", clock: 21.0, pos: [11.55, EYE, 6.3], tgt: [13.9, 0.9, 1.4], via: [P(13.5, 12.2), P(13.9, 9.4), P(13.0, 7.0)],
     text: "After dark the lamps take over, warm and low over the table. That was the tour. Thanks for visiting." },
 ];
@@ -1626,7 +1789,7 @@ function startGuide() {
   ensureAudio();
   $("gProg").innerHTML = GUIDE.map(() => "<i><b></b></i>").join("");
   guide = { i: 0, phase: "move", t: 0, leg: null, paused: false, lastClock: 0,
-    monkeyStop: GUIDE.findIndex((g) => g.name === "The library wall"), monkeyAfter: 3, monkeyDone: false };
+    monkeyStop: GUIDE.findIndex((g) => g.name === "The library wall"), monkeyAfter: 0, monkeyDone: false };
   const g0 = GUIDE[0];
   camera.position.set(...g0.pos); ({ yaw, pitch } = lookAngles(g0.pos, g0.tgt)); applyLook();
   setClock(g0.clock);
@@ -1640,6 +1803,7 @@ function startGuide() {
 function endGuide() {
   if (!guide) return;
   guide = null;
+  sendReaderHome();
   document.body.classList.remove("guided");
   $("guide").hidden = true;
   $("play").focus({ preventScroll: true });
@@ -1678,7 +1842,7 @@ function updateGuide(dt) {
     // a slow look around while the text is read
     yaw = guide.baseYaw + Math.sin(guide.t * 0.42) * 0.11 * Math.min(1, guide.t / 1.5);
     if (bar) bar.style.width = (30 + 70 * Math.min(1, guide.t / guide.dwell)).toFixed(1) + "%";
-    if (!guide.monkeyDone && guide.i === guide.monkeyStop && guide.t > guide.monkeyAfter) { guide.monkeyDone = true; startTroop(true); return; }
+    if (!guide.monkeyDone && guide.i === guide.monkeyStop && guide.t >= guide.monkeyAfter) { guide.monkeyDone = true; startTroop(true); return; }
     const last = guide.i >= GUIDE.length - 1;
     if (guide.t >= guide.dwell + (last ? 4 : 0)) { if (last) { endGuide(); return; } nextGuideStop(); }
   }
@@ -1792,48 +1956,106 @@ function viewDir() { return new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw))
 function floorSpot(from, rMin = 0.9, rMax = 4.2, spread = 1.4) {
   const c = camera.position;
   for (let k = 0; k < 24; k++) {
-    const ang = yaw + Math.PI + (Math.random() * 2 - 1) * spread + Math.PI, r = rMin + Math.random() * (rMax - rMin);
+    const ang = yaw + (Math.random() * 2 - 1) * spread, r = rMin + Math.random() * (rMax - rMin);
     const x = c.x - Math.sin(ang) * r, z = c.z - Math.cos(ang) * r;
     if (blocked(x, z) || (from && !clearLine(from.x, from.z, x, z))) continue;
     return new THREE.Vector3(x, floorAt(x, z), z);
   }
   return null;
 }
+// ---- the monkeys live in the Reduit
+const REDUIT = INFO.rooms.find((r) => r.name === "Reduit");
+const V = (x, z) => new THREE.Vector3(x, 0, z);
+const OUT_ROUTE = [V(10.31, 7.15), V(10.31, 6.25), V(10.95, 5.8), V(11.65, 5.95)];   // Reduit door, corridor, into the living room
+const tribe = [];
+let reader = null, readerBook = null;
+function homeSpot(i) {
+  const [x0, z0, x1, z1] = REDUIT.bounds;
+  for (let k = 0; k < 60; k++) {
+    const x = x0 + 0.3 + Math.random() * (x1 - x0 - 0.6), z = z0 + 0.35 + Math.random() * (z1 - z0 - 0.7);
+    if (!blocked(x, z) && !tribe.some((m) => Math.hypot(m.home.x - x, m.home.z - z) < 0.32)) return V(x, z);
+  }
+  return V(9.5 + (i % 3) * 0.3, 7.2 + Math.floor(i / 3) * 0.3);
+}
+function sitPose(m, on) {
+  m.legs[0].rotation.x = m.legs[1].rotation.x = on ? -1.45 : 0;
+  m.arms[0].rotation.x = m.arms[1].rotation.x = on ? -0.5 : 0;
+}
+function settleHome(m) {
+  m.mode = "home"; m.pos.copy(m.home); m.pos.y = floorAt(m.home.x, m.home.z) - 0.19 * m.size;
+  m.heading = m.homeHeading; m.pivot.rotation.x = 0; m.root.scale.setScalar(m.size);
+  sitPose(m, true); m.head.rotation.set(0, 0, 0);
+  m.root.position.copy(m.pos); m.root.rotation.y = m.heading;
+}
+function buildTribe() {
+  for (let i = 0; i < 7; i++) {
+    const m = makeMonkey(i);
+    m.home = homeSpot(i); tribe.push(m);
+    m.homeHeading = Math.atan2(10.31 - m.home.x, 7.0 - m.home.z) + (Math.random() - 0.5) * 1.2; // mostly facing the door
+    troopRoot.add(m.root); settleHome(m);
+  }
+}
+function makeBook() {
+  const g = new THREE.Group(), cover = new THREE.MeshStandardMaterial({ color: "#7c2f2b", roughness: 0.7 }), page = new THREE.MeshStandardMaterial({ color: "#efe8d8", roughness: 0.9 });
+  for (const sx of [-1, 1]) {
+    const half = new THREE.Group(); half.rotation.y = sx * 0.42; g.add(half);
+    const c = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.11, 0.006), cover); c.position.x = sx * 0.04; half.add(c);
+    const pg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.012), page); pg.position.set(sx * 0.04, 0, 0.008); half.add(pg);
+  }
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
 function startTroop(fromTour) {
-  if (troop || mode !== "walk" || photoOn) return;
+  if (troop || mode !== "walk" || photoOn || !tribe.length) return;
   ensureAudio();
   collectSurfaces();
-  const n = 7, list = [];
-  for (let i = 0; i < n; i++) {
-    const m = makeMonkey(i);
-    // they burst in from behind and beside the camera
-    let p = null;
-    for (let k = 0; k < 30 && !p; k++) {
-      const ang = yaw + Math.PI + (Math.random() * 2 - 1) * 1.9, r = 2.6 + Math.random() * 2.4;
-      const x = camera.position.x - Math.sin(ang) * r, z = camera.position.z - Math.cos(ang) * r;
-      if (!blocked(x, z) && clearLine(camera.position.x, camera.position.z, x, z)) p = new THREE.Vector3(x, floorAt(x, z), z);
-    }
-    p ??= camera.position.clone().setY(floorAt(camera.position.x, camera.position.z)).addScaledVector(viewDir(), -0.8);
-    m.pos.copy(p); m.home = p.clone(); m.root.position.copy(p);
-    m.t = -i * 0.18; // staggered entrance
-    m.mode = "wait";
-    troopRoot.add(m.root); list.push(m);
+  const list = tribe.filter((m) => m !== reader);
+  list.forEach((m, i) => {
+    sitPose(m, false); m.root.scale.setScalar(m.size);
+    m.pos.y = floorAt(m.pos.x, m.pos.z);
+    m.route = OUT_ROUTE.map((v) => v.clone());
+    m.leaving = false; m.gone = false;
+    m.mode = "wait"; m.t = -i * 0.22;     // single file through the Reduit door
+  });
+  // the bookish one heads for the library wall instead
+  if (fromTour && !reader) {
+    reader = list[0];
+    reader.route = [...OUT_ROUTE.map((v) => v.clone()), V(12.6, 6.9), V(14.25, 6.45)];
+    reader.task = "fetch";
   }
   troop = { list, t: 0, fromTour, ending: false };
   if (fromTour) {
     $("guide").classList.add("monkeys");
     $("gTitle").textContent = "Hang on.";
-    $("gText").textContent = "Who let the monkeys in?";
+    $("gText").textContent = "The Reduit door is open. The neighbours are out.";
   }
-  chatter(0, 0.9, 6);
+  chatter(0.4, 0.9, 6);
 }
 function endTroop(now) {
   if (!troop) return;
-  if (now) { troopRoot.clear(); troop = null; return; }
+  if (now) { for (const m of troop.list) if (m !== reader || !m.task) settleHome(m); troop = null; return; }
   troop.ending = true;
-  for (const m of troop.list) { m.leaving = true; if (m.mode !== "jump") goRun(m, m.home); }
+  for (const m of troop.list) {
+    if (m === reader && m.task) continue;
+    m.leaving = true;
+    m.route = [V(11.65, 5.95), V(10.95, 5.8), V(10.31, 6.25), V(10.31, 7.15), m.home.clone()];
+    if (m.mode !== "jump") nextLeg(m);
+  }
+}
+function sendReaderHome() {
+  if (!reader) return;
+  readerBook?.removeFromParent(); readerBook = null;
+  const m = reader; reader = null; m.task = null; settleHome(m);
 }
 function goRun(m, p) { m.mode = "run"; m.t = 0; m.target.copy(p); m.onTop = false; }
+// follow m.route leg by leg, hopping over furniture where a straight run would go through it
+function nextLeg(m) {
+  const p = m.route.shift();
+  if (!p) return false;
+  p.y = floorAt(p.x, p.z);
+  if (crossesFurniture(m.pos, p)) goJump(m, p, { h: 0.7 }); else goRun(m, p);
+  return true;
+}
 function goJump(m, p, opts = {}) {
   m.mode = "jump"; m.t = 0; m.a.copy(m.pos); m.b.copy(p);
   const d = Math.hypot(p.x - m.pos.x, p.z - m.pos.z);
@@ -1843,9 +2065,15 @@ function goJump(m, p, opts = {}) {
   if (Math.random() < 0.5) chatter(panOf(m.pos), 0.5, 2 + Math.floor(Math.random() * 3));
 }
 function panOf(p) { const v = p.clone().sub(camera.position); const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); return v.normalize().dot(right); }
+// what to do next on arriving somewhere
+function arrive(m) {
+  if (m.route?.length) return nextLeg(m);
+  if (m.leaving) { settleHome(m); m.gone = true; return; }
+  if (m === reader && m.task) return readerStep(m);
+  choose(m);
+}
 function choose(m) {
-  if (m.leaving) return goRun(m, m.home);
-  const r = Math.random(), near = surfaces.filter((s) => Math.hypot(s.it.x - m.pos.x, s.it.z - m.pos.z) < 3.4);
+  const r = Math.random(), near = surfaces.filter((s) => Math.hypot(s.it.x - m.pos.x, s.it.z - m.pos.z) < 3.4 && s.it.id !== "mb-strandmon");
   if (m.onTop) {
     if (r < 0.25 && near.length) return goJump(m, surfacePoint(near[Math.floor(Math.random() * near.length)]), { onTop: true });
     if (r < 0.35) { m.mode = "sit"; m.t = 0; m.dur = 0.6 + Math.random() * 0.9; return; }
@@ -1864,81 +2092,126 @@ function choose(m) {
   if (!f) return goJump(m, m.pos.clone(), { flip: true, h: 0.5, dur: 0.6 });
   return crossesFurniture(m.pos, f) ? goJump(m, f, { h: 0.75 }) : goRun(m, f);
 }
-function crossesFurniture(a, b) {
-  const n = Math.ceil(a.distanceTo(b) / 0.12);
-  for (let k = 1; k < n; k++) { const x = a.x + (b.x - a.x) * k / n, z = a.z + (b.z - a.z) * k / n; if (furnBoxes.some((q) => x > q[0] && x < q[2] && z > q[1] && z < q[3])) return true; }
-  return false;
+// the reader: take a book from the BILLY wall, climb into the STRANDMON, read until the tour ends
+const CHAIR = ITEMS.find((it) => it.id === "mb-strandmon");
+function readerStep(m) {
+  if (m.task === "fetch") { m.task = "reach"; m.mode = "reach"; m.t = 0; face(m, 1, 0, 1, 99); return; }
+  if (m.task === "carry") {
+    if (!CHAIR) { m.task = null; return choose(m); }
+    const a = (CHAIR.rot ?? 0) * Math.PI / 180, fx = Math.sin(a), fz = Math.cos(a); // the chair's front
+    const seat = new THREE.Vector3(CHAIR.x + fx * 0.06, elevM(CHAIR) + 0.47, CHAIR.z + fz * 0.06);
+    m.task = "climb"; m.seat = seat; m.seatHeading = Math.atan2(fx, fz);
+    const before = V(CHAIR.x + fx * 0.85, CHAIR.z + fz * 0.85);
+    if (Math.hypot(before.x - m.pos.x, before.z - m.pos.z) > 0.1) { m.route = [before]; return nextLeg(m); }
+  }
+  if (m.task === "climb") {
+    m.task = "sitdown";
+    return goJump(m, m.seat.clone(), { h: 0.35, dur: 0.55 });
+  }
+  if (m.task === "sitdown") {
+    m.task = "read"; m.mode = "read"; m.t = 0;
+    m.heading = m.seatHeading; m.pos.y = m.seat.y - 0.2 * m.size;
+  }
+}
+function holdBook(m) {
+  readerBook ??= makeBook();
+  m.pivot.add(readerBook);
+  readerBook.position.set(0, 0.03, 0.17); readerBook.rotation.set(-0.75, 0, 0);
 }
 function face(m, dx, dz, dt, rate = 10) {
   if (Math.abs(dx) + Math.abs(dz) < 1e-4) return;
   const want = Math.atan2(dx, dz);
   m.heading += Math.atan2(Math.sin(want - m.heading), Math.cos(want - m.heading)) * Math.min(1, dt * rate);
 }
+function crossesFurniture(a, b) {
+  const n = Math.ceil(a.distanceTo(b) / 0.12);
+  for (let k = 1; k < n; k++) { const x = a.x + (b.x - a.x) * k / n, z = a.z + (b.z - a.z) * k / n; if (furnBoxes.some((q) => x > q[0] && x < q[2] && z > q[1] && z < q[3])) return true; }
+  return false;
+}
+function animateMonkey(m, dt, time) {
+  m.t += dt;
+  let bob = 0, swing = 0, armsUp = 0;
+  if (m.mode === "wait") { if (m.t >= 0) nextLeg(m); }
+  else if (m.mode === "run") {
+    const dx = m.target.x - m.pos.x, dz = m.target.z - m.pos.z, d = Math.hypot(dx, dz);
+    if (d < 0.06) arrive(m);
+    else {
+      const step = Math.min(d, m.speed * dt);
+      m.pos.x += dx / d * step; m.pos.z += dz / d * step; m.pos.y = floorAt(m.pos.x, m.pos.z);
+      m.phase += dt * m.speed * 5.2;
+      bob = Math.abs(Math.sin(m.phase)) * 0.12; swing = Math.sin(m.phase);
+      face(m, dx, dz, dt);
+    }
+  } else if (m.mode === "jump") {
+    const k = Math.min(1, m.t / m.dur);
+    m.pos.lerpVectors(m.a, m.b, k); m.pos.y = m.a.y + (m.b.y - m.a.y) * k + 4 * m.h * k * (1 - k);
+    face(m, m.b.x - m.a.x, m.b.z - m.a.z, dt, 14);
+    m.pivot.rotation.x = m.flip ? -k * Math.PI * 2 : -0.25 * Math.sin(k * Math.PI);
+    armsUp = 1;
+    if (k >= 1) { m.pivot.rotation.x = 0; m.pos.copy(m.b); arrive(m); }
+  } else if (m.mode === "sit") {
+    m.arms[1].rotation.x = -2.4 + Math.sin(m.t * 22) * 0.35; // a quick scratch
+    m.head.rotation.y = Math.sin(m.t * 6) * 0.5;
+    if (m.t > m.dur) { m.head.rotation.y = 0; arrive(m); }
+  } else if (m.mode === "reach") {
+    // up on tiptoe to the third shelf, then the book comes out
+    m.arms[0].rotation.x = -2.9 + Math.sin(m.t * 9) * 0.15; m.arms[1].rotation.x = -2.6;
+    m.pos.y = floorAt(m.pos.x, m.pos.z) + Math.min(0.06, m.t * 0.2);
+    if (m.t > 1.1) { holdBook(m); m.task = "carry"; m.mode = "pause"; m.t = 0; chatter(panOf(m.pos), 0.5, 2); }
+    m.root.position.copy(m.pos); m.root.rotation.y = m.heading; return;
+  } else if (m.mode === "pause") {
+    m.arms[0].rotation.x = m.arms[1].rotation.x = -1.2; face(m, -1, 0.3, dt, 6);
+    if (m.t > 0.5) readerStep(m);
+    m.root.position.copy(m.pos); m.root.rotation.y = m.heading; return;
+  } else if (m.mode === "read") {
+    sitPose(m, true);
+    m.arms[0].rotation.x = m.arms[1].rotation.x = -1.25;
+    m.head.rotation.x = 0.38 + Math.sin(time * 0.7) * 0.04;          // eyes down, the odd nod
+    m.head.rotation.y = Math.sin(time * 0.23) * 0.12;
+    if (readerBook) readerBook.rotation.z = Math.sin(time * 0.31) * 0.05;
+    m.root.position.copy(m.pos); m.root.rotation.y = m.heading; return;
+  } else if (m.mode === "home") return;
+  if (m.mode !== "sit") {
+    const hold = readerBook && m === reader ? -1.2 : null;
+    m.arms[0].rotation.x = hold ?? (armsUp ? -2.7 : swing * 1.1); m.arms[1].rotation.x = hold ?? (armsUp ? -2.7 : -swing * 1.1);
+  }
+  m.legs[0].rotation.x = -swing * 0.9; m.legs[1].rotation.x = swing * 0.9;
+  m.tail.rotation.z = Math.sin(time * 3 + m.phase) * 0.25;
+  m.root.position.set(m.pos.x, m.pos.y + bob, m.pos.z);
+  m.root.rotation.y = m.heading;
+}
 function updateTroop(dt) {
-  troop.t += dt;
-  if (!troop.ending && troop.t > 17) endTroop(false);
-  for (const m of troop.list) {
-    if (m.gone) continue;
-    m.t += dt;
-    const floor = floorAt(m.pos.x, m.pos.z);
-    let bob = 0, swing = 0, armsUp = 0;
-    if (m.mode === "wait") { if (m.t >= 0) { m.mode = "run"; const f = floorSpot(m.pos) ?? m.pos.clone(); goRun(m, f); } }
-    else if (m.mode === "run") {
-      const dx = m.target.x - m.pos.x, dz = m.target.z - m.pos.z, d = Math.hypot(dx, dz);
-      if (d < 0.06 || (m.leaving && m.t > 2.2)) {
-        if (m.leaving) { m.mode = "out"; m.t = 0; }
-        else choose(m);
-      } else {
-        const step = Math.min(d, m.speed * dt);
-        m.pos.x += dx / d * step; m.pos.z += dz / d * step; m.pos.y = floorAt(m.pos.x, m.pos.z);
-        m.phase += dt * m.speed * 5.2;
-        bob = Math.abs(Math.sin(m.phase)) * 0.12; swing = Math.sin(m.phase);
-        face(m, dx, dz, dt);
+  const time = performance.now() / 1000;
+  if (troop) {
+    troop.t += dt;
+    if (!troop.ending && troop.t > 17) endTroop(false);
+    for (const m of troop.list) {
+      if (m.gone && m !== reader) continue;
+      animateMonkey(m, dt, time);
+      if (!m.gone && m.mode !== "home" && m.mode !== "read" && (m.nextCall -= dt) <= 0) { m.nextCall = 0.6 + Math.random() * 2.2; chatter(panOf(m.pos), 0.6 / (1 + m.pos.distanceTo(camera.position) * 0.4)); }
+    }
+    // during the tour, the camera follows the commotion
+    if (troop.fromTour && guide) {
+      const live = troop.list.filter((m) => !m.gone && m.mode !== "wait" && m.mode !== "home");
+      if (live.length) {
+        const c = live.reduce((a, m) => a.add(m.pos), new THREE.Vector3()).multiplyScalar(1 / live.length);
+        const want = Math.atan2(-(c.x - camera.position.x), -(c.z - camera.position.z));
+        yaw += Math.atan2(Math.sin(want - yaw), Math.cos(want - yaw)) * Math.min(1, dt * 1.6);
+        pitch += (-0.28 - pitch) * Math.min(1, dt * 2);
+        applyLook();
       }
-    } else if (m.mode === "jump") {
-      const k = Math.min(1, m.t / m.dur);
-      m.pos.lerpVectors(m.a, m.b, k); m.pos.y = m.a.y + (m.b.y - m.a.y) * k + 4 * m.h * k * (1 - k);
-      face(m, m.b.x - m.a.x, m.b.z - m.a.z, dt, 14);
-      m.pivot.rotation.x = m.flip ? -k * Math.PI * 2 : -0.25 * Math.sin(k * Math.PI);
-      armsUp = 1;
-      if (k >= 1) { m.pivot.rotation.x = 0; m.pos.copy(m.b); choose(m); }
-    } else if (m.mode === "sit") {
-      swing = 0; m.arms[1].rotation.x = -2.4 + Math.sin(m.t * 22) * 0.35; // a quick scratch
-      m.head.rotation.y = Math.sin(m.t * 6) * 0.5;
-      if (m.t > m.dur) { m.head.rotation.y = 0; choose(m); }
-    } else if (m.mode === "out") {
-      const s = Math.max(0, 1 - m.t / 0.35); m.root.scale.setScalar(m.size * s);
-      if (s <= 0) { m.gone = true; troopRoot.remove(m.root); }
     }
-    if (m.mode !== "sit") {
-      m.arms[0].rotation.x = armsUp ? -2.7 : swing * 1.1; m.arms[1].rotation.x = armsUp ? -2.7 : -swing * 1.1;
+    if (troop.list.every((m) => m.gone || (m === reader && m.task === "read"))) {
+      const fromTour = troop.fromTour; troop = null;
+      for (const m of tribe) if (m.gone) m.gone = false;
+      if (fromTour && guide) {
+        $("gTitle").textContent = "Right.";
+        $("gText").textContent = "Back to the Reduit, all but one. Where were we?";
+        guide.phase = "dwell"; guide.t = Math.max(0, guide.dwell - 3.2); guide.baseYaw = yaw;
+        setTimeout(() => { if (guide) renderGuideCard(); }, 3000);
+      }
     }
-    m.legs[0].rotation.x = -swing * 0.9; m.legs[1].rotation.x = swing * 0.9;
-    m.tail.rotation.z = Math.sin(troop.t * 3 + m.phase) * 0.25;
-    m.root.position.set(m.pos.x, m.pos.y + bob, m.pos.z);
-    m.root.rotation.y = m.heading;
-    if ((m.nextCall -= dt) <= 0 && !m.gone) { m.nextCall = 0.6 + Math.random() * 2.2; chatter(panOf(m.pos), 0.6 / (1 + m.pos.distanceTo(camera.position) * 0.4)); }
-  }
-  // during the tour, the camera follows the commotion
-  if (troop.fromTour && guide) {
-    const live = troop.list.filter((m) => !m.gone && m.mode !== "wait");
-    if (live.length) {
-      const c = live.reduce((a, m) => a.add(m.pos), new THREE.Vector3()).multiplyScalar(1 / live.length);
-      const want = Math.atan2(-(c.x - camera.position.x), -(c.z - camera.position.z));
-      yaw += Math.atan2(Math.sin(want - yaw), Math.cos(want - yaw)) * Math.min(1, dt * 1.6);
-      pitch += (-0.28 - pitch) * Math.min(1, dt * 2);
-      applyLook();
-    }
-  }
-  if (troop.list.every((m) => m.gone)) {
-    const fromTour = troop.fromTour; troop = null;
-    if (fromTour && guide) {
-      $("gTitle").textContent = "Right.";
-      $("gText").textContent = "Where were we?";
-      guide.phase = "dwell"; guide.t = Math.max(0, guide.dwell - 2.6); guide.baseYaw = yaw;
-      setTimeout(() => { if (guide) renderGuideCard(); }, 2400);
-    }
-  }
+  } else if (reader) animateMonkey(reader, dt, time);   // still reading after the others went home
   markDirty();
 }
 // secret word
@@ -2064,6 +2337,7 @@ function setClock(t) {
   sunLight.intensity = 3.9 * Math.pow(Tl, 0.8) * sstep(-0.01, 0.05, Math.sin(sun.el));
   sunLight.position.copy(CENTER).addScaledVector(sun.dir, 40); sunLight.target.position.copy(CENTER);
   fill.intensity = 0.85 * sky.day + 0.04;
+  if (scene.fog) scene.fog.color.setRGB(...mix([0.02, 0.025, 0.04], [0.74, 0.8, 0.86], sky.day).map((v, i) => Math.min(1, v * (1 - 0.35 * sky.warm) + sky.hor[i] * 0.35 * sky.warm)));
   fill.color.setRGB(...mix([0.95, 0.96, 0.97], sky.hor.map((v) => Math.min(1, v)), 0.6 * sky.warm));
   for (const l of lamps) {
     l.light.intensity = l.power * Math.max(night, 0.0);
@@ -2100,6 +2374,7 @@ async function setPhoto(on) {
       await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
       for (const g of glassMeshes) { glassRaster.set(g, g.material); g.material = glassPhoto; }
       scene.traverse((o) => { if (o.userData.caustic) o.visible = false; });
+      for (const o of photoHide) o.visible = false;
       scene.environment = scene.background = skyDataTexture();
       if (!pt) {
         pt = new WebGLPathTracer(renderer);
@@ -2114,6 +2389,7 @@ async function setPhoto(on) {
       console.error(e);
       for (const [g, m] of glassRaster) g.material = m;
       scene.traverse((o) => { if (o.userData.caustic) o.visible = true; });
+      for (const o of photoHide) o.visible = true;
       scene.environment = scene.background = envRT.texture;
       $("photo").setAttribute("aria-pressed", "false");
       setStatus("Photo mode needs WebGL 2 and the jsDelivr CDN; it could not start here.");
@@ -2123,6 +2399,7 @@ async function setPhoto(on) {
     photoOn = false; $("photo").setAttribute("aria-pressed", "false"); renderer.toneMappingExposure = baseExposure;
     for (const [g, m] of glassRaster) g.material = m;
     scene.traverse((o) => { if (o.userData.caustic) o.visible = true; });
+    for (const o of photoHide) o.visible = true;
     scene.environment = scene.background = envRT.texture;
     setStatus(""); markDirty();
   }
@@ -2195,7 +2472,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (guide && !guide.paused && !troop && mode === "walk") updateGuide(dt);
-  if (troop) updateTroop(dt);
+  if (troop || reader) updateTroop(dt);
   if (mode === "walk") {
     if (glide) {
       const t = Math.min(1, (now - glide.t0) / glide.dur), e = ease(t);
@@ -2249,12 +2526,14 @@ new GLTFLoader().parse(bytes.buffer, "", async (gltf) => {
   const box = new THREE.Box3().setFromObject(walls ?? gltf.scene);
   CENTER.set((box.min.x + box.max.x) / 2, 0, (box.min.z + box.max.z) / 2);
   addSurroundings(box);
+  addNeighbourhood(box);
   shafts.march.material.uniforms.roof.value.set(box.min.x, box.min.z, box.max.x, box.max.z);
   loadMsg(`Furnishing ${ITEMS.length} pieces…`);
   await new Promise((r) => setTimeout(r, 20));
   buildFurniture();
   furnRoot.traverse((o) => { if (o.isMesh && o.material && !o.material.transparent) o.receiveShadow = true; });
   collectFurnBoxes();
+  buildTribe();
   drawMapBase();
   renderStops();
   resize();
