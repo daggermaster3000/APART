@@ -128,7 +128,7 @@ a dollhouse view, and **Photo** mode, which path-traces the current view with
 
 **Guided tour** walks the visitor through eleven stops along real doorways at walking pace, with narration,
 a progress bar, pause/next/end controls, and the sun moving from 08:30 to an evening finale with the lamps on.
-Once per tour, at a random stop, something unexpected happens (typing `banana` anywhere has the same effect).
+At the library wall, every time, something unexpected happens (typing `banana` anywhere has the same effect).
 
 Rendering techniques follow the [shader-dev skill](https://github.com/MiniMax-AI/skills/tree/main/skills/shader-dev):
 a physical sky (Rayleigh, Mie and ozone single scattering, rendered on the GPU into the environment map) with

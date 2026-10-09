@@ -897,7 +897,7 @@ function startGuide() {
   ensureAudio();
   $("gProg").innerHTML = GUIDE.map(() => "<i><b></b></i>").join("");
   guide = { i: 0, phase: "move", t: 0, leg: null, paused: false, lastClock: 0,
-    monkeyStop: 2 + Math.floor(Math.random() * (GUIDE.length - 4)), monkeyAfter: 1.5 + Math.random() * 3.5, monkeyDone: false };
+    monkeyStop: GUIDE.findIndex((g) => g.name === "The library wall"), monkeyAfter: 3, monkeyDone: false };
   const g0 = GUIDE[0];
   camera.position.set(...g0.pos); ({ yaw, pitch } = lookAngles(g0.pos, g0.tgt)); applyLook();
   setClock(g0.clock);
@@ -962,7 +962,7 @@ $("gExit").onclick = () => { if (troop) endTroop(true); endGuide(); };
 $("gSound").onclick = () => { soundOn = !soundOn; $("gSound").setAttribute("aria-pressed", String(soundOn)); $("gSound").textContent = soundOn ? "Sound on" : "Sound off"; try { localStorage.setItem("l0802-visit-sound", soundOn ? "1" : "0"); } catch {} };
 
 // =====================================================================
-// Easter egg: the monkeys. Once per guided tour, at a random stop.
+// Easter egg: the monkeys. Every guided tour, three seconds into the library wall.
 // (Or type "banana" anywhere.)
 // =====================================================================
 let soundOn = true;
