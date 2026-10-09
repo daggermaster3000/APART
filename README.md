@@ -128,7 +128,8 @@ a dollhouse view, and **Photo** mode, which path-traces the current view with
 
 **Guided tour** walks the visitor through eleven stops along real doorways at walking pace, with narration,
 a progress bar, pause/next/end controls, and the sun moving from 08:30 to an evening finale with the lamps on.
-The flat's seven monkeys live in the Reduit; at the library wall they burst out, and one of them takes a book
+The flat's seven monkeys live in the Reduit; walk past its door (the guided tour does, on the way to the
+library) and they burst out, and on the tour one of them takes a book
 from the BILLY wall and reads in the STRANDMON for the rest of the tour (typing `banana` lets them out any time).
 
 The surroundings are traced from an aerial photo of Lehmgrubenstrasse 8 (0.204 m per pixel): paths and

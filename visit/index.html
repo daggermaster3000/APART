@@ -1789,7 +1789,7 @@ function startGuide() {
   ensureAudio();
   $("gProg").innerHTML = GUIDE.map(() => "<i><b></b></i>").join("");
   guide = { i: 0, phase: "move", t: 0, leg: null, paused: false, lastClock: 0,
-    monkeyStop: GUIDE.findIndex((g) => g.name === "The library wall"), monkeyAfter: 0, monkeyDone: false };
+  };
   const g0 = GUIDE[0];
   camera.position.set(...g0.pos); ({ yaw, pitch } = lookAngles(g0.pos, g0.tgt)); applyLook();
   setClock(g0.clock);
@@ -1842,7 +1842,6 @@ function updateGuide(dt) {
     // a slow look around while the text is read
     yaw = guide.baseYaw + Math.sin(guide.t * 0.42) * 0.11 * Math.min(1, guide.t / 1.5);
     if (bar) bar.style.width = (30 + 70 * Math.min(1, guide.t / guide.dwell)).toFixed(1) + "%";
-    if (!guide.monkeyDone && guide.i === guide.monkeyStop && guide.t >= guide.monkeyAfter) { guide.monkeyDone = true; startTroop(true); return; }
     const last = guide.i >= GUIDE.length - 1;
     if (guide.t >= guide.dwell + (last ? 4 : 0)) { if (last) { endGuide(); return; } nextGuideStop(); }
   }
@@ -1855,7 +1854,7 @@ $("gExit").onclick = () => { if (troop) endTroop(true); endGuide(); };
 $("gSound").onclick = () => { soundOn = !soundOn; $("gSound").setAttribute("aria-pressed", String(soundOn)); $("gSound").textContent = soundOn ? "Sound on" : "Sound off"; try { localStorage.setItem("l0802-visit-sound", soundOn ? "1" : "0"); } catch {} };
 
 // =====================================================================
-// Easter egg: the monkeys. Every guided tour, three seconds into the library wall.
+// Easter egg: the monkeys. They burst out of the Reduit when someone walks past its door.
 // (Or type "banana" anywhere.)
 // =====================================================================
 let soundOn = true;
@@ -2027,7 +2026,7 @@ function startTroop(fromTour) {
   if (fromTour) {
     $("guide").classList.add("monkeys");
     $("gTitle").textContent = "Hang on.";
-    $("gText").textContent = "The Reduit door is open. The neighbours are out.";
+    $("gText").textContent = "Someone left the Reduit door open. The residents are out.";
   }
   chatter(0.4, 0.9, 6);
 }
@@ -2191,7 +2190,7 @@ function updateTroop(dt) {
       if (!m.gone && m.mode !== "home" && m.mode !== "read" && (m.nextCall -= dt) <= 0) { m.nextCall = 0.6 + Math.random() * 2.2; chatter(panOf(m.pos), 0.6 / (1 + m.pos.distanceTo(camera.position) * 0.4)); }
     }
     // during the tour, the camera follows the commotion
-    if (troop.fromTour && guide) {
+    if (troop.fromTour && guide && guide.phase === "dwell") {
       const live = troop.list.filter((m) => !m.gone && m.mode !== "wait" && m.mode !== "home");
       if (live.length) {
         const c = live.reduce((a, m) => a.add(m.pos), new THREE.Vector3()).multiplyScalar(1 / live.length);
@@ -2202,17 +2201,25 @@ function updateTroop(dt) {
       }
     }
     if (troop.list.every((m) => m.gone || (m === reader && m.task === "read"))) {
-      const fromTour = troop.fromTour; troop = null;
+      const fromTour = troop.fromTour; troop = null; lastTroopEnd = performance.now();
       for (const m of tribe) if (m.gone) m.gone = false;
       if (fromTour && guide) {
         $("gTitle").textContent = "Right.";
         $("gText").textContent = "Back to the Reduit, all but one. Where were we?";
-        guide.phase = "dwell"; guide.t = Math.max(0, guide.dwell - 3.2); guide.baseYaw = yaw;
-        setTimeout(() => { if (guide) renderGuideCard(); }, 3000);
+        if (guide.phase === "dwell") { guide.t = 0; guide.baseYaw = yaw; }
+        setTimeout(() => { if (guide) renderGuideCard(); }, 2600);
       }
     }
   } else if (reader) animateMonkey(reader, dt, time);   // still reading after the others went home
   markDirty();
+}
+// walking past the Reduit door lets them out; once per pass, and not again for half a minute
+const REDUIT_DOOR = { x: 10.31, z: 6.15 };
+let doorArmed = true, lastTroopEnd = -1e9;
+function checkReduitDoor() {
+  const d = Math.hypot(camera.position.x - REDUIT_DOOR.x, camera.position.z - REDUIT_DOOR.z);
+  if (d > 2.4) { if (!troop && performance.now() - lastTroopEnd > 30000) doorArmed = true; return; }
+  if (d < 1.15 && doorArmed && !troop) { doorArmed = false; startTroop(!!guide); }
 }
 // secret word
 let typed = "";
@@ -2471,7 +2478,8 @@ let camKey = "";
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (guide && !guide.paused && !troop && mode === "walk") updateGuide(dt);
+  if (guide && !guide.paused && (!troop || guide.phase === "move") && mode === "walk") updateGuide(dt);
+  if (mode === "walk" && !photoOn) checkReduitDoor();
   if (troop || reader) updateTroop(dt);
   if (mode === "walk") {
     if (glide) {
