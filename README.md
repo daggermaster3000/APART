@@ -126,6 +126,10 @@ where you stand, the real sun path for Zurich on 8 October (morning, midday, gol
 a dollhouse view, and **Photo** mode, which path-traces the current view with
 [three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer) and refines while you hold still.
 
+**Guided tour** walks the visitor through eleven stops along real doorways at walking pace, with narration,
+a progress bar, pause/next/end controls, and the sun moving from 08:30 to an evening finale with the lamps on.
+Once per tour, at a random stop, something unexpected happens (typing `banana` anywhere has the same effect).
+
 Rendering techniques follow the [shader-dev skill](https://github.com/MiniMax-AI/skills/tree/main/skills/shader-dev):
 a physical sky (Rayleigh, Mie and ozone single scattering, rendered on the GPU into the environment map) with
 sunlight coloured by its transmittance through the atmosphere; volumetric sun shafts ray-marched through the sun's
