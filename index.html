@@ -1419,8 +1419,10 @@ function buildTrainerBike(g, it, mats) {
   const tab = blk(g, makeMat("#151719", "plastic"), stem[0] - 0.02, stem[0] + 0.0, stem[1] + 0.06, stem[1] + 0.24, -0.12, 0.12, 0.006); if (tab) { tab.rotation.z = 0.35; }
   rod(g, makeMat("#e8dfd0", "plastic"), P(0.16, 0.38), P(0.27, 0.52), 0.035);
   // crankset and pedals
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.008, 28), alu); ring.rotation.x = Math.PI / 2; ring.position.set(BB[0], BB[1], 0.065); g.add(ring);
-  for (const [sgn, z] of [[1, 0.075], [-1, -0.075]]) { const end = [BB[0] + sgn * 0.12, BB[1] - sgn * 0.12, z]; rod(g, black, [BB[0], BB[1], z], end, 0.012); blk(g, black, end[0] - 0.05, end[0] + 0.05, end[1] - 0.01, end[1] + 0.01, z + sgn * 0.0 - 0.05, z + 0.05); }
+  // the crank turns as one part around the bottom bracket (userData.crank), pedals at ±45°
+  const crank = new THREE.Group(); crank.position.set(BB[0], BB[1], 0); crank.userData.crank = true; g.add(crank);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.008, 28), alu); ring.rotation.x = Math.PI / 2; ring.position.set(0, 0, 0.065); crank.add(ring);
+  for (const [sgn, z] of [[1, 0.075], [-1, -0.075]]) { const end = [sgn * 0.12, -sgn * 0.12, z]; rod(crank, black, [0, 0, z], end, 0.012); blk(crank, black, end[0] - 0.05, end[0] + 0.05, end[1] - 0.01, end[1] + 0.01, z - 0.05, z + 0.05); }
   // front wheel in its riser block
   const tyre = new THREE.Mesh(new THREE.TorusGeometry(0.33 * k, 0.014, 10, 48), rubber); tyre.position.set(F[0], F[1], 0); tyre.castShadow = true; g.add(tyre);
   const rim = new THREE.Mesh(new THREE.TorusGeometry(0.3 * k, 0.012, 8, 48), alu); rim.position.copy(tyre.position); g.add(rim);
