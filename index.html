@@ -683,10 +683,14 @@ const SHAPES = {
   brewkettle: { label: "Brew kettle on burner", def: [55, 55, 110] },
   fermenter:{ label: "Fermenter",        def: [35, 35, 60] },
   guitar:   { label: "Guitar on stand",  def: [40, 35, 105] },
+  trainerbike: { label: "Bike on smart trainer", def: [180, 60, 110] },
+  tvstand:  { label: "TV on rolling stand", def: [97, 60, 150] },
   box:      { label: "Plain block",      def: [100, 60, 75] },
 };
 // slug keyword -> shape, first match wins (order matters: "sofa-bed" is a sofa)
 const SHAPE_RULES = [
+  [/smart-trainer|turbo-trainer|indoor-trainer|rollentrainer|home-?trainer|kickr|zwift|tacx|wahoo|neo-2t/, "trainerbike"],
+  [/tv-stand|tv-staender|tv-standfuss|floor-stand|rolling-stand|tv-cart/, "tvstand"],
   [/guitar|gitarre|guitare|ukulele/, "guitar"], [/aquarium|aquarien/, "aquarium"], [/raised-bed|hochbeet|planter-box/, "raisedbed"],
   [/brew-kettle|braukessel|sudkessel|brewzilla|grainfather/, "brewkettle"], [/fermenter|gärbehälter|garbehalter|gaerbottich/, "fermenter"],
   [/day-?bed|tagesbett|lit-de-repos/, "daybed"], [/pegboard|lochplatte/, "pegboard"],
@@ -865,6 +869,7 @@ const STYLE_FIELDS = {
   plant: ["material", "foliage"], deco: ["material", "profile"], box: ["material"],
   daybed: ["material"], pegboard: ["material"], wallshelf: ["material"], curtain: ["material"], officechair: ["material"], monitor: ["material"],
   aquarium: ["material"], raisedbed: ["material"], brewkettle: ["material"], fermenter: ["material"], guitar: ["material"],
+  trainerbike: ["material"], tvstand: ["material"],
 };
 const TYPE_STYLE = {
   sofa: { material: "fabric", legs: "block", legHeight: 6, arms: "slim", back: "loose-cushions" },
@@ -882,6 +887,7 @@ const TYPE_STYLE = {
   curtain: { material: "fabric" }, officechair: { material: "plastic" }, monitor: { material: "plastic" },
   aquarium: { material: "wood" }, raisedbed: { material: "wood" }, brewkettle: { material: "metal" }, fermenter: { material: "plastic" },
   guitar: { material: "wood" },
+  trainerbike: { material: "metal" }, tvstand: { material: "metal" },
 };
 function measOf(it) {
   return { ...(CATALOG.find((c) => c.re.test(it.slug ?? ""))?.meas ?? {}), ...(it.meas ?? {}) };
@@ -1379,6 +1385,85 @@ function buildMonitor(g, it, mats) {
   blk(g, screen, -w / 2 + 0.01, w / 2 - 0.01, h * 0.25 + 0.01, h - 0.01, 0.008, 0.01);
   return [[-w / 2, -d / 2, w / 2, d / 2]];
 }
+// road bike on a direct-drive smart trainer, on its mat, with a floor fan; front of the bike is +x
+function rod(g, mat, a, b, r) {
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), dir = B.clone().sub(A), len = dir.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 10), mat);
+  m.position.copy(A).addScaledVector(dir, 0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
+}
+function buildTrainerBike(g, it, mats) {
+  const L = it.w / 100, W = it.d / 100, k = Math.min(1.15, Math.max(0.85, L / 1.8));
+  const frame = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(it.colour), roughness: 0.35, metalness: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.2, clippingPlanes: [cutPlane] });
+  const black = makeMat("#1d1f21", "plastic"), rubber = new THREE.MeshStandardMaterial({ color: 0x18191a, roughness: 0.95, clippingPlanes: [cutPlane] });
+  const unit = makeMat(it.colour2 ?? "#232527", "plastic"), alu = makeMat("#b9bec3", "metal");
+  blk(g, rubber, -L / 2, L / 2, 0, 0.006, -W / 2 - 0.16, W / 2 + 0.16, 0.004);                       // trainer mat
+  const P = (x, y, z = 0) => [x * k, y * k, z];
+  const R = P(-0.42, 0.34), BB = P(0.0, 0.27), S = P(-0.16, 0.8), H = P(0.44, 0.8), Hb = P(0.48, 0.64), F = P(0.6, 0.35);
+  // the trainer: flywheel housing, legs, cassette at the rear axle
+  const fly = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * k, 0.2 * k, 0.11, 32), unit); fly.rotation.x = Math.PI / 2; fly.position.set(R[0] + 0.06, 0.25 * k, -0.06); fly.castShadow = true; g.add(fly);
+  blk(g, unit, R[0] - 0.05, R[0] + 0.2, 0.04, R[1] - 0.02, -0.07, -0.01, 0.02);
+  for (const lx of [R[0] - 0.12, R[0] + 0.28]) blk(g, unit, lx - 0.025, lx + 0.025, 0.006, 0.05, -0.38, 0.38, 0.01);
+  const cas = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.04, 16), alu); cas.rotation.x = Math.PI / 2; cas.position.set(R[0], R[1], 0.03); g.add(cas);
+  // frame (paired stays and fork)
+  rod(g, frame, S, H, 0.017); rod(g, frame, BB, Hb, 0.021); rod(g, frame, BB, S, 0.017); rod(g, frame, Hb, H, 0.022);
+  for (const z of [-0.045, 0.045]) { rod(g, frame, [BB[0], BB[1], z], [R[0], R[1], z], 0.01); rod(g, frame, [S[0] + 0.02, S[1] - 0.04, z * 0.6], [R[0], R[1], z], 0.009); rod(g, frame, [Hb[0], Hb[1], z * 0.5], [F[0], F[1], z], 0.011); }
+  // saddle and seatpost, stem, bars with drops, hoods
+  const post = P(-0.24, 0.96); rod(g, black, S, post, 0.014);
+  const sad = blk(g, black, post[0] - 0.15, post[0] + 0.12, post[1], post[1] + 0.035, -0.07, 0.07, 0.015);
+  const stem = P(0.55, 0.86); rod(g, black, H, stem, 0.016);
+  rod(g, black, [stem[0], stem[1], -0.21], [stem[0], stem[1], 0.21], 0.012);
+  for (const z of [-0.21, 0.21]) { rod(g, black, [stem[0], stem[1], z], [stem[0] + 0.08, stem[1] - 0.05, z], 0.012); rod(g, black, [stem[0] + 0.08, stem[1] - 0.05, z], [stem[0] + 0.04, stem[1] - 0.15, z], 0.012); }
+  blk(g, black, stem[0] + 0.03, stem[0] + 0.1, stem[1] - 0.01, stem[1] + 0.05, -0.23, -0.19, 0.01); blk(g, black, stem[0] + 0.03, stem[0] + 0.1, stem[1] - 0.01, stem[1] + 0.05, 0.19, 0.23, 0.01);
+  // tablet on the bars, bottle on the down tube
+  const tab = blk(g, makeMat("#151719", "plastic"), stem[0] - 0.02, stem[0] + 0.0, stem[1] + 0.06, stem[1] + 0.24, -0.12, 0.12, 0.006); if (tab) { tab.rotation.z = 0.35; }
+  rod(g, makeMat("#e8dfd0", "plastic"), P(0.16, 0.38), P(0.27, 0.52), 0.035);
+  // crankset and pedals
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.008, 28), alu); ring.rotation.x = Math.PI / 2; ring.position.set(BB[0], BB[1], 0.065); g.add(ring);
+  for (const [sgn, z] of [[1, 0.075], [-1, -0.075]]) { const end = [BB[0] + sgn * 0.12, BB[1] - sgn * 0.12, z]; rod(g, black, [BB[0], BB[1], z], end, 0.012); blk(g, black, end[0] - 0.05, end[0] + 0.05, end[1] - 0.01, end[1] + 0.01, z + sgn * 0.0 - 0.05, z + 0.05); }
+  // front wheel in its riser block
+  const tyre = new THREE.Mesh(new THREE.TorusGeometry(0.33 * k, 0.014, 10, 48), rubber); tyre.position.set(F[0], F[1], 0); tyre.castShadow = true; g.add(tyre);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.3 * k, 0.012, 8, 48), alu); rim.position.copy(tyre.position); g.add(rim);
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; rod(g, alu, [F[0], F[1], 0], [F[0] + Math.cos(a) * 0.3 * k, F[1] + Math.sin(a) * 0.3 * k, 0], 0.0018); }
+  blk(g, black, F[0] - 0.09, F[0] + 0.09, 0.006, F[1] - 0.33 * k + 0.01, -0.07, 0.07, 0.02);
+  // floor fan at the front corner, aimed at the rider
+  const fx = L / 2 - 0.08, fz = -W / 2 - 0.02, fan = new THREE.Group(); fan.position.set(fx, 0, fz); fan.rotation.y = Math.PI / 2 + 0.5; g.add(fan);
+  blk(fan, black, -0.14, 0.14, 0.006, 0.03, -0.12, 0.12, 0.01); rod(fan, black, [0, 0.03, 0], [0, 0.42, 0], 0.012);
+  const ringF = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.012, 8, 32), black); ringF.position.set(0, 0.52, 0); fan.add(ringF);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 16), black); hub.rotation.x = Math.PI / 2; hub.position.set(0, 0.52, -0.02); fan.add(hub);
+  return [[-L / 2, -W / 2, L / 2, W / 2]];
+}
+// a flat screen on a rolling floor stand; the screen faces +z and shows a ride in progress
+let rideTex = null;
+function rideScreen() {
+  if (rideTex) return rideTex;
+  const c = document.createElement("canvas"); c.width = 512; c.height = 288; const x = c.getContext("2d");
+  const sky = x.createLinearGradient(0, 0, 0, 160); sky.addColorStop(0, "#5b8fd1"); sky.addColorStop(1, "#cfe3f2"); x.fillStyle = sky; x.fillRect(0, 0, 512, 288);
+  x.fillStyle = "#7aa35a"; x.beginPath(); x.moveTo(0, 150); for (let i = 0; i <= 512; i += 16) x.lineTo(i, 140 - 25 * Math.sin(i / 70) - 12 * Math.sin(i / 23)); x.lineTo(512, 288); x.lineTo(0, 288); x.fill();
+  x.fillStyle = "#5c8a44"; x.fillRect(0, 175, 512, 113);
+  x.fillStyle = "#6d6f73"; x.beginPath(); x.moveTo(206, 160); x.lineTo(306, 160); x.lineTo(470, 288); x.lineTo(42, 288); x.fill();
+  x.strokeStyle = "#f2f2ee"; x.lineWidth = 3; x.setLineDash([14, 14]); x.beginPath(); x.moveTo(256, 162); x.lineTo(256, 288); x.stroke(); x.setLineDash([]);
+  for (const [px, py, s, col] of [[238, 205, 1, "#e0662a"], [282, 182, 0.7, "#2b7bd6"], [262, 172, 0.5, "#e2c23a"]]) { x.fillStyle = col; x.fillRect(px - 6 * s, py - 18 * s, 12 * s, 18 * s); x.fillStyle = "#222"; x.beginPath(); x.arc(px, py + 4 * s, 9 * s, 0, 7); x.fill(); }
+  x.fillStyle = "rgba(20,22,26,.72)"; x.fillRect(150, 8, 212, 44);
+  x.fillStyle = "#fff"; x.font = "600 24px Karla, sans-serif"; x.textAlign = "center"; x.fillText("246 W   34.8 km/h", 256, 38);
+  x.fillStyle = "rgba(20,22,26,.6)"; x.fillRect(8, 236, 150, 44); x.fillStyle = "#f2b33d"; x.font = "500 15px Karla, sans-serif"; x.textAlign = "left"; x.fillText("12.4 km  ·  +186 m", 16, 263);
+  rideTex = new THREE.CanvasTexture(c); rideTex.colorSpace = THREE.SRGBColorSpace;
+  return rideTex;
+}
+function buildTvStand(g, it, mats) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, sh = w * 9 / 16, metal = makeMat(it.colour, "metal");
+  for (const sx of [-1, 1]) {
+    blk(g, metal, sx * 0.22 - 0.025, sx * 0.22 + 0.025, 0.05, 0.08, -d / 2, d / 2, 0.01);
+    for (const sz of [-1, 1]) { const c = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 8), makeMat("#1d1f21", "plastic")); c.position.set(sx * 0.22, 0.035, sz * (d / 2 - 0.04)); g.add(c); }
+  }
+  blk(g, metal, -0.25, 0.25, 0.08, 0.11, -0.04, 0.04, 0.01);
+  for (const sx of [-1, 1]) blk(g, metal, sx * 0.1 - 0.025, sx * 0.1 + 0.025, 0.08, h - sh * 0.5, -0.06, -0.02, 0.008);
+  blk(g, metal, -0.3, 0.3, 0.55, 0.57, -0.08, 0.12, 0.006);                                          // little shelf for the bottle
+  blk(g, makeMat("#202224", "plastic"), -w / 2, w / 2, h - sh, h, -0.02, 0.02, 0.006);
+  const screen = new THREE.MeshStandardMaterial({ map: rideScreen(), emissive: 0xffffff, emissiveMap: rideScreen(), emissiveIntensity: 0.55, roughness: 0.25, clippingPlanes: [cutPlane] });
+  blk(g, screen, -w / 2 + 0.012, w / 2 - 0.012, h - sh + 0.012, h - 0.012, 0.02, 0.022);
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
 function buildAquarium(g, it, mats) {
   const w = it.w / 100, d = it.d / 100, h = it.h / 100, cab = Math.min(0.8, h * 0.55), tank = h - cab - 0.06;
   blk(g, mats.dark, -w / 2 + 0.02, w / 2 - 0.02, 0, 0.06, -d / 2 + 0.02, d / 2 - 0.03);           // plinth
@@ -1508,7 +1593,8 @@ function buildItem(it) {
     storage: buildStorage, shelving: buildStorage, rug: buildRug, lamp: buildLamp, tablelamp: buildTableLamp,
     pendant: buildPendant, plant: buildPlant, deco: buildDeco, daybed: buildDaybed, pegboard: buildPegboard,
     wallshelf: buildWallShelf, curtain: buildCurtain, officechair: buildOfficeChair, monitor: buildMonitor,
-    aquarium: buildAquarium, raisedbed: buildRaisedBed, brewkettle: buildBrewKettle, fermenter: buildFermenter, guitar: buildGuitar }[it.type];
+    aquarium: buildAquarium, raisedbed: buildRaisedBed, brewkettle: buildBrewKettle, fermenter: buildFermenter, guitar: buildGuitar,
+    trainerbike: buildTrainerBike, tvstand: buildTvStand }[it.type];
   let rects;
   if (fn) rects = fn(g, it, mats, st);
   else { blk(g, main, -it.w / 200, it.w / 200, 0, it.h / 100, -it.d / 200, it.d / 200); rects = [[-it.w / 200, -it.d / 200, it.w / 200, it.d / 200]]; }
@@ -1555,7 +1641,7 @@ function surfaceTop(o) {
     case "officechair": return y + 0.5;
     case "raisedbed": return y + h - 0.04;
     case "pendant": case "lamp": case "tablelamp": case "plant": case "pegboard": case "curtain": case "monitor":
-    case "aquarium": case "brewkettle": case "fermenter": case "guitar": return null;
+    case "aquarium": case "brewkettle": case "fermenter": case "guitar": case "trainerbike": case "tvstand": return null;
     default: return y + h;
   }
 }

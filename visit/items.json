@@ -314,8 +314,8 @@
   "colour": "#d2b48c",
   "colour2": "#f1f0ec",
   "rot": 90,
-  "x": 9.472,
-  "z": 2.02
+  "x": 8.495000000000001,
+  "z": 2.3200000000000003
  },
  {
   "id": "fdc5c972-a246-4187-a101-355886e957e3",
@@ -777,7 +777,7 @@
   "colour": "#e8dfd0",
   "rot": 0,
   "x": 14.5,
-  "z": 0.6
+  "z": 2.05
  },
  {
   "id": "mb-fermenter-1",
@@ -1181,8 +1181,8 @@
   },
   "colour": "#3e5a6b",
   "rot": 0,
-  "x": 10.3,
-  "z": -0.55
+  "x": 9.872,
+  "z": -0.73
  },
  {
   "id": "mb-raised-bed-1",
@@ -1694,8 +1694,8 @@
   "colour": "#f1f0ec",
   "colour2": "#5a5d61",
   "rot": 270,
-  "x": 9.296999999999999,
-  "z": 4.045
+  "x": 9.247,
+  "z": 2.245
  },
  {
   "id": "z2-curtain-1",
@@ -1745,8 +1745,8 @@
   },
   "colour": "#f1f0ec",
   "rot": 0,
-  "x": 9.272,
-  "z": 2.6999999999999997
+  "x": 8.295000000000002,
+  "z": 3
  },
  {
   "id": "z2-frame-1",
@@ -1867,8 +1867,8 @@
   "elev": 73,
   "colour": "#3a3d40",
   "rot": 90,
-  "x": 9.56,
-  "z": 2.02
+  "x": 8.583000000000002,
+  "z": 2.3200000000000003
  },
  {
   "id": "z2-lamp",
@@ -1888,8 +1888,8 @@
   },
   "colour": "#2b2b2d",
   "rot": 90,
-  "x": 9.292,
-  "z": 1.42
+  "x": 8.315000000000001,
+  "z": 1.7200000000000002
  },
  {
   "id": "z2-monitor",
@@ -1905,8 +1905,8 @@
   "elev": 73,
   "colour": "#2b2b2d",
   "rot": 90,
-  "x": 9.272,
-  "z": 2.02
+  "x": 8.295000000000002,
+  "z": 2.3200000000000003
  },
  {
   "id": "z2-plant-basket",
@@ -2038,5 +2038,44 @@
   "rot": 90,
   "x": 8.115,
   "z": 2.1
+ },
+ {
+  "id": "zwift-bike",
+  "slug": "zwift-smart-trainer-bike",
+  "family": "Zwift setup",
+  "desc": "road bike on a direct-drive smart trainer, mat and fan",
+  "type": "trainerbike",
+  "w": 180,
+  "d": 60,
+  "h": 110,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "metal"
+  },
+  "colour": "#7c8b74",
+  "colour2": "#232527",
+  "rot": 0,
+  "x": 13.25,
+  "z": 1
+ },
+ {
+  "id": "zwift-screen",
+  "slug": "tv-rolling-stand",
+  "family": "Zwift screen",
+  "desc": "43-inch TV on a rolling stand",
+  "type": "tvstand",
+  "w": 97,
+  "d": 60,
+  "h": 150,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "metal"
+  },
+  "colour": "#2b2b2d",
+  "rot": 270,
+  "x": 14.45,
+  "z": 1
  }
 ]

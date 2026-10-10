@@ -18,7 +18,8 @@ built from the brochure floor plan in `source/floorplan_L08.02.pdf`.
 Paste an IKEA product link (any country site, any colour variant) into **Furnish → Add IKEA furniture**.
 The page reads the product name, article number and colour from the link and builds a to-scale
 block model of it (sofa with optional chaise, armchair, bed, table, desk, chair, cabinet, open
-shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, or a plain block).
+shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, bike on a smart trainer, TV on a
+rolling stand, or a plain block).
 
 - **Sizes.** The page cannot open ikea.com (its network access is blocked), so sizes come from, in order:
   a built-in list of common products checked against IKEA's measurements (VIMLE, KIVIK, MALM, STRANDMON,
