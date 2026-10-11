@@ -19,7 +19,10 @@ Paste an IKEA product link (any country site, any colour variant) into **Furnish
 The page reads the product name, article number and colour from the link and builds a to-scale
 block model of it (sofa with optional chaise, armchair, bed, table, desk, chair, cabinet, open
 shelving, rug, floor lamp, table lamp, pendant lamp, plant, decoration, bike on a smart trainer, TV on a
-rolling stand, or a plain block).
+rolling stand, flower border, compost bin, stepping stones, bird bath, or a plain block). Raised beds take a
+*Planting* style: the 120 × 120 cm carré from « Mon carré chou-chou » in spring (parsley, lettuces and cosmos,
+two onion rows, carrots with radishes, strawberries on straw) or in late May (chard and staked cherry tomatoes
+in the lettuces' place).
 
 - **Sizes.** The page cannot open ikea.com (its network access is blocked), so sizes come from, in order:
   a built-in list of common products checked against IKEA's measurements (VIMLE, KIVIK, MALM, STRANDMON,

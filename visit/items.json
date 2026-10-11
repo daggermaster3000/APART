@@ -340,6 +340,184 @@
   "z": 1.8650000000000002
  },
  {
+  "id": "garden-bench",
+  "slug": "garden-bench",
+  "family": "Garden bench",
+  "desc": "oak, against the house wall",
+  "type": "table",
+  "w": 140,
+  "d": 38,
+  "h": 45,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "wood",
+   "legs": "square",
+   "top": "rect",
+   "topThick": 4,
+   "apron": false
+  },
+  "colour": "#b08a5a",
+  "rot": 0,
+  "x": 6.9,
+  "z": -0.5
+ },
+ {
+  "id": "garden-birdbath",
+  "slug": "garden-birdbath",
+  "family": "Bird bath",
+  "desc": "stone",
+  "type": "birdbath",
+  "w": 50,
+  "d": 50,
+  "h": 75,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "ceramic"
+  },
+  "colour": "#bdb8ad",
+  "rot": 0,
+  "x": 4.95,
+  "z": -2.55
+ },
+ {
+  "id": "garden-border-s",
+  "slug": "garden-border-s",
+  "family": "Flower border",
+  "desc": "lavender, coneflowers, grasses and daisies along the hedge",
+  "type": "flowerbed",
+  "w": 650,
+  "d": 55,
+  "h": 70,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "fabric"
+  },
+  "colour": "#5a4030",
+  "rot": 0,
+  "x": 7.5,
+  "z": -5.36
+ },
+ {
+  "id": "garden-border-w",
+  "slug": "garden-border-w",
+  "family": "Flower border",
+  "desc": "lavender, coneflowers, grasses and daisies",
+  "type": "flowerbed",
+  "w": 280,
+  "d": 50,
+  "h": 60,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "fabric"
+  },
+  "colour": "#5a4030",
+  "rot": 90,
+  "x": 4.26,
+  "z": -3.55
+ },
+ {
+  "id": "garden-compost",
+  "slug": "garden-compost",
+  "family": "Compost bin",
+  "desc": "larch slats, for the carrés",
+  "type": "compost",
+  "w": 70,
+  "d": 70,
+  "h": 80,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "wood"
+  },
+  "colour": "#a77b4f",
+  "colour2": "#6e5038",
+  "rot": 0,
+  "x": 10.45,
+  "z": -4.68
+ },
+ {
+  "id": "garden-lavender-1",
+  "slug": "garden-lavender-1",
+  "family": "Plant",
+  "desc": "lavender in terracotta",
+  "type": "plant",
+  "w": 40,
+  "d": 40,
+  "h": 55,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "ceramic",
+   "foliage": "bushy"
+  },
+  "colour": "#b5653f",
+  "rot": 0,
+  "x": 10.7,
+  "z": -0.45
+ },
+ {
+  "id": "garden-lavender-2",
+  "slug": "garden-lavender-2",
+  "family": "Plant",
+  "desc": "lavender in terracotta",
+  "type": "plant",
+  "w": 40,
+  "d": 40,
+  "h": 55,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "ceramic",
+   "foliage": "bushy"
+  },
+  "colour": "#b5653f",
+  "rot": 0,
+  "x": 8.25,
+  "z": -0.45
+ },
+ {
+  "id": "garden-path-1",
+  "slug": "garden-path-1",
+  "family": "Stepping stones",
+  "desc": "from the terrace to the carrés",
+  "type": "stepstones",
+  "w": 270,
+  "d": 45,
+  "h": 4,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "ceramic"
+  },
+  "colour": "#a8a49c",
+  "rot": 0,
+  "x": 9.55,
+  "z": -3.85
+ },
+ {
+  "id": "garden-path-2",
+  "slug": "garden-path-2",
+  "family": "Stepping stones",
+  "desc": "between the carrés",
+  "type": "stepstones",
+  "w": 160,
+  "d": 45,
+  "h": 4,
+  "chaise": 0,
+  "mount": "floor",
+  "style": {
+   "material": "ceramic"
+  },
+  "colour": "#a8a49c",
+  "rot": 90,
+  "x": 6.45,
+  "z": -3.85
+ },
+ {
   "id": "mb-aquarium",
   "slug": "aquarium-120",
   "family": "Aquarium",
@@ -1186,39 +1364,43 @@
  },
  {
   "id": "mb-raised-bed-1",
-  "slug": "raised-bed",
-  "family": "Raised bed",
-  "desc": "larch, 200×80×70 cm",
+  "slug": "mb-raised-bed-1",
+  "family": "Carré potager",
+  "desc": "spring, as in the book: parsley, lettuces, cosmos, onions, carrots & radishes, strawberries",
   "type": "raisedbed",
-  "w": 200,
-  "d": 80,
-  "h": 70,
+  "w": 120,
+  "d": 120,
+  "h": 30,
   "chaise": 0,
+  "mount": "floor",
   "style": {
-   "material": "wood"
+   "material": "wood",
+   "planting": "carre-spring"
   },
-  "colour": "#a77b4f",
-  "rot": 0,
-  "x": 6.372,
-  "z": -4.13
+  "colour": "#b98a5a",
+  "rot": 180,
+  "x": 5.55,
+  "z": -3.85
  },
  {
   "id": "mb-raised-bed-2",
-  "slug": "raised-bed",
-  "family": "Raised bed",
-  "desc": "larch, 200×80×70 cm",
+  "slug": "mb-raised-bed-2",
+  "family": "Carré potager",
+  "desc": "late May: chard and staked cherry tomatoes where the lettuces were",
   "type": "raisedbed",
-  "w": 200,
-  "d": 80,
-  "h": 70,
+  "w": 120,
+  "d": 120,
+  "h": 30,
   "chaise": 0,
+  "mount": "floor",
   "style": {
-   "material": "wood"
+   "material": "wood",
+   "planting": "carre-may"
   },
-  "colour": "#a77b4f",
-  "rot": 0,
-  "x": 6.321999999999999,
-  "z": -2.48
+  "colour": "#b98a5a",
+  "rot": 180,
+  "x": 7.35,
+  "z": -3.85
  },
  {
   "id": "mb-reading-lamp",

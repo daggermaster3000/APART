@@ -1081,7 +1081,7 @@ const ROOM_NOTES = {
   "Reduit": "Storage room with the washer-dryer.",
 };
 function placeName(x, z) {
-  if (z < 0.05 && x > 3.9) return { name: "South garden", note: "Lawn, two larch raised beds, a beer-garden table and the brewing corner. Fields and forest beyond the hedge.", area: INFO.terraces?.[0]?.plan_area_m2 };
+  if (z < 0.05 && x > 3.9) return { name: "South garden", note: "Two carrés potagers, flower borders, a beer-garden table and the brewing corner. Meadow and forest beyond the hedge.", area: INFO.terraces?.[0]?.plan_area_m2 };
   if (z > 12.95) return { name: "North terrace", note: "Small paved terrace on the north-west corner, for the evening light.", area: INFO.terraces?.[1]?.plan_area_m2 };
   for (const r of INFO.rooms) { const [a, b, c, d] = r.bounds; if (x >= a - 0.08 && x <= c + 0.08 && z >= b - 0.08 && z <= d + 0.08) return { name: r.name, note: ROOM_NOTES[r.name] ?? "", area: r.plan_area_m2, dims: [c - a, d - b] }; }
   if (x < 4.2) return { name: "Treppenhaus", note: "Shared stairwell and lift.", area: INFO.shared?.[0]?.plan_area_m2 };
@@ -1110,7 +1110,7 @@ const STOPS = [
   { name: "Lounge", pos: [14.3, EYE, 8.95], tgt: [12.1, 0.7, 11.7] },
   { name: "Bedroom", pos: [5.2, EYE, 4.3], tgt: [7.4, 0.9, 1.2] },
   { name: "Zimmer 2", pos: [9.25, EYE, 4.25], tgt: [9.9, 1.0, 0.8] },
-  { name: "Garden", pos: [5.0, 1.45, -5.3], tgt: [11.2, 0.55, -1.8] },
+  { name: "Garden", pos: [9.3, 1.5, -1.25], tgt: [6.4, 0.15, -4.1] },
   { name: "Brewing", pos: [12.4, 1.5, -0.7], tgt: [14.8, 0.5, -4.2] },
   { name: "Terrace", pos: [12.5, 1.55, 12.3], tgt: [13.6, 0.4, 15.4] },
 ];
@@ -1172,9 +1172,9 @@ const GUIDE = [
     text: "Across from the books, a 120-litre planted aquarium sits on an oak cabinet. Its light ripples over the sand all day." },
   { name: "Dining", clock: 13.0, pos: [11.55, EYE, 6.3], tgt: [13.9, 0.9, 1.4], via: [P(13.0, 7.2)],
     text: "The oak table seats six under two rattan domes, a step from the kitchen counter. By the garden glass, the bike waits on its smart trainer, screen and fan ready for a Zwift ride." },
-  { name: "Kitchen garden", clock: 14.5, pos: [5.0, 1.45, -5.3], tgt: [11.2, 0.55, -1.8], via: [P(12.1, 5.0), P(12.1, 1.0), P(12.0, -0.8), P(8.5, -3.4)],
-    text: "Outside, 61 m² of south-facing lawn and paving. Two larch raised beds for vegetables and herbs, a laurel hedge, and beyond it the path down past the fields to the forest." },
-  { name: "Brewing corner", clock: 15.5, pos: [12.4, 1.5, -0.7], tgt: [14.8, 0.5, -4.2], via: [P(8.5, -3.0), P(11.0, -1.7)],
+  { name: "Kitchen garden", clock: 14.5, pos: [9.3, 1.5, -1.25], tgt: [6.4, 0.15, -4.1], via: [P(12.1, 5.0), P(12.1, 1.0), P(11.4, -0.9)],
+    text: "Two square carrés, 120 by 120 cm, planted from « Mon carré chou-chou »: parsley, lettuces and cosmos at the back, two rows of onions, carrots with radishes, strawberries on straw. The second is a month on, with chard and staked cherry tomatoes where the lettuces were. Borders of lavender and coneflowers, a compost bin, and stepping stones across the lawn." },
+  { name: "Brewing corner", clock: 15.5, pos: [12.4, 1.5, -0.7], tgt: [14.8, 0.5, -4.2], via: [P(10.6, -1.3)],
     text: "By the house wall, the brewing station: kettle on its gas burner, two fermenters and the bottle crates. The beer-garden table is right there." },
   { name: "Lounge", clock: 17.0, pos: [14.3, EYE, 8.95], tgt: [12.1, 0.7, 11.7], via: [P(12.1, -0.6), P(12.1, 1.0), P(12.1, 4.8), P(12.7, 6.4), P(13.7, 8.1)],
     text: "Back inside for the late afternoon. The KIVIK sofa with its chaise looks west, into the evening sun." },

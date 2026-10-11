@@ -368,6 +368,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 const INFO = /*MODEL_INFO*/null;
 const GLB = "MODEL_GLB_BASE64";
@@ -657,6 +658,7 @@ const CATALOG = [
   { re: /pax.*wardrobe/, type: "storage", w: 100, d: 58, h: 201, style: { material: "painted", fronts: "doors", handles: "bar", legs: "plinth" } },
 ];
 
+const flatType = (t) => t === "rug" || t === "stepstones";
 const SHAPES = {
   sofa:     { label: "Sofa",             def: [220, 95, 83] },
   armchair: { label: "Armchair",         def: [80, 85, 95] },
@@ -685,12 +687,18 @@ const SHAPES = {
   guitar:   { label: "Guitar on stand",  def: [40, 35, 105] },
   trainerbike: { label: "Bike on smart trainer", def: [180, 60, 110] },
   tvstand:  { label: "TV on rolling stand", def: [97, 60, 150] },
+  flowerbed: { label: "Flower border",   def: [300, 50, 60] },
+  compost:  { label: "Compost bin",      def: [80, 80, 80] },
+  stepstones: { label: "Stepping stones", def: [270, 45, 4] },
+  birdbath: { label: "Bird bath",        def: [50, 50, 75] },
   box:      { label: "Plain block",      def: [100, 60, 75] },
 };
 // slug keyword -> shape, first match wins (order matters: "sofa-bed" is a sofa)
 const SHAPE_RULES = [
   [/smart-trainer|turbo-trainer|indoor-trainer|rollentrainer|home-?trainer|kickr|zwift|tacx|wahoo|neo-2t/, "trainerbike"],
   [/tv-stand|tv-staender|tv-standfuss|floor-stand|rolling-stand|tv-cart/, "tvstand"],
+  [/compost|komposter|kompost/, "compost"], [/stepping-stone|trittplatte|trittstein|pas-japonais/, "stepstones"],
+  [/bird-bath|vogeltraenke|vogelbad|bain-d-oiseaux/, "birdbath"], [/flower-bed|border|staudenbeet|massif/, "flowerbed"],
   [/guitar|gitarre|guitare|ukulele/, "guitar"], [/aquarium|aquarien/, "aquarium"], [/raised-bed|hochbeet|planter-box/, "raisedbed"],
   [/brew-kettle|braukessel|sudkessel|brewzilla|grainfather/, "brewkettle"], [/fermenter|gärbehälter|garbehalter|gaerbottich/, "fermenter"],
   [/day-?bed|tagesbett|lit-de-repos/, "daybed"], [/pegboard|lochplatte/, "pegboard"],
@@ -855,6 +863,7 @@ const STYLE_OPTIONS = {
   shade: ["dome", "cone", "drum", "globe", "bell"],
   profile: ["auto", "vase-tall", "vase-round", "bottle", "cylinder", "bowl", "frame"],
   foliage: ["leafy", "upright", "bushy"],
+  planting: ["mixed", "carre-spring", "carre-may"],
   lsection: ["chaise", "corner"],
 };
 // which style fields matter for which shape
@@ -868,8 +877,9 @@ const STYLE_FIELDS = {
   rug: ["material"], lamp: ["material", "shade"], tablelamp: ["material", "shade"], pendant: ["material", "shade"],
   plant: ["material", "foliage"], deco: ["material", "profile"], box: ["material"],
   daybed: ["material"], pegboard: ["material"], wallshelf: ["material"], curtain: ["material"], officechair: ["material"], monitor: ["material"],
-  aquarium: ["material"], raisedbed: ["material"], brewkettle: ["material"], fermenter: ["material"], guitar: ["material"],
+  aquarium: ["material"], raisedbed: ["material", "planting"], brewkettle: ["material"], fermenter: ["material"], guitar: ["material"],
   trainerbike: ["material"], tvstand: ["material"],
+  flowerbed: ["material"], compost: ["material"], stepstones: ["material"], birdbath: ["material"],
 };
 const TYPE_STYLE = {
   sofa: { material: "fabric", legs: "block", legHeight: 6, arms: "slim", back: "loose-cushions" },
@@ -888,6 +898,7 @@ const TYPE_STYLE = {
   aquarium: { material: "wood" }, raisedbed: { material: "wood" }, brewkettle: { material: "metal" }, fermenter: { material: "plastic" },
   guitar: { material: "wood" },
   trainerbike: { material: "metal" }, tvstand: { material: "metal" },
+  flowerbed: { material: "fabric" }, compost: { material: "wood" }, stepstones: { material: "ceramic" }, birdbath: { material: "ceramic" },
 };
 function measOf(it) {
   return { ...(CATALOG.find((c) => c.re.test(it.slug ?? ""))?.meas ?? {}), ...(it.meas ?? {}) };
@@ -1492,6 +1503,157 @@ function buildAquarium(g, it, mats) {
   }
   return [[-w / 2, -d / 2, w / 2, d / 2]];
 }
+// ---- garden builders. Small plants are merged per colour, so a whole bed is a handful of draw calls.
+const PG = {};
+const pgGeo = (k) => PG[k] ??= ({ ico0: () => new THREE.IcosahedronGeometry(1, 0), ico1: () => new THREE.IcosahedronGeometry(1, 1), cyl: () => new THREE.CylinderGeometry(1, 1, 1, 6),
+  cone: () => new THREE.ConeGeometry(1, 1, 7), disc: () => new THREE.CylinderGeometry(1, 1, 0.12, 10), box: () => new THREE.BoxGeometry(1, 1, 1) })[k]().toNonIndexed();
+function planter(g) {
+  const parts = new Map(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), P = new THREE.Vector3(), S = new THREE.Vector3();
+  return {
+    put(hex, kind, geo, x, y, z, sx = 1, sy = sx, sz = sx, rx = 0, ry = 0, rz = 0) {
+      M.compose(P.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), S.set(sx, sy, sz));
+      const key = hex + kind; if (!parts.has(key)) parts.set(key, { hex, kind, list: [] });
+      parts.get(key).list.push(pgGeo(geo).clone().applyMatrix4(M));
+    },
+    // a thin stalk from (x, y, z) leaning by (dx, dz) over its height h
+    stalk(hex, x, y, z, h, r, dx = 0, dz = 0) {
+      const tilt = Math.atan2(Math.hypot(dx, dz), h), az = Math.atan2(dx, dz);
+      M.compose(P.set(x + dx / 2, y + h / 2, z + dz / 2), Q.setFromEuler(E.set(tilt * Math.cos(az), 0, -tilt * Math.sin(az))), S.set(r, Math.hypot(h, dx, dz), r));
+      const key = hex + "plastic"; if (!parts.has(key)) parts.set(key, { hex, kind: "plastic", list: [] });
+      parts.get(key).list.push(pgGeo("cyl").clone().applyMatrix4(M));
+    },
+    done() {
+      for (const { hex, kind, list } of parts.values()) {
+        const m = new THREE.Mesh(mergeGeometries(list, false), makeMat(hex, kind));
+        m.castShadow = true; m.receiveShadow = true; g.add(m);
+      }
+    },
+  };
+}
+// « Mon carré chou-chou », spring page: 120 x 120 cm; back band 40 cm (parsley 30 | lettuces | cosmos 30),
+// two onion rows of 23, a row of carrots with radishes, strawberries on straw. "carre-may": the book's
+// « J'anticipe » - chard and staked cherry tomatoes in the gaps the lettuces leave.
+function plantCarre(g, it, top, may) {
+  const w = it.w / 100, d = it.d / 100, t = 0.045, X0 = -w / 2 + t, W = w - 2 * t, Z0 = -d / 2 + t, Dd = d - 2 * t;
+  const kz = Dd / 1.2, kx = W / 1.2, y = top, p = planter(g);
+  let seed = (it.id ?? "c").length * 131 + (may ? 7 : 3); const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const zA0 = Z0, zA1 = Z0 + 0.4 * kz, xP1 = X0 + 0.3 * kx, xC0 = X0 + W - 0.3 * kx;
+  // parsley: a dense flat-leaf mound
+  for (let i = 0; i < 46; i++) p.put(i % 3 ? "#4e8a3a" : "#68a24a", "plastic", "ico0", X0 + 0.03 + r() * (xP1 - X0 - 0.06), y + 0.03 + r() * 0.1, zA0 + 0.04 + r() * (zA1 - zA0 - 0.08), 0.028 + r() * 0.02, 0.02, 0.028 + r() * 0.02, r() * 3, r() * 3, 0);
+  // lettuces: three staggered rows of loose heads
+  const lettuce = (x, z, s = 1) => { for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + r(); p.put("#8cc457", "plastic", "ico1", x + Math.cos(a) * 0.045 * s, y + 0.035 * s, z + Math.sin(a) * 0.045 * s, 0.06 * s, 0.035 * s, 0.06 * s, 0.3, a, 0); }
+    p.put("#b7de7c", "plastic", "ico1", x, y + 0.06 * s, z, 0.045 * s, 0.04 * s, 0.045 * s); };
+  const lx0 = xP1 + 0.08, lx1 = xC0 - 0.08, rowsZ = [0.09, 0.2, 0.31].map((f) => Z0 + f * kz);
+  rowsZ.forEach((z, j) => { const n = Math.max(2, Math.round((lx1 - lx0) / 0.2) + 1);
+    for (let i = 0; i < n; i++) { const x = lx0 + (lx1 - lx0) * (i + (j % 2 ? 0.5 : 0)) / (n - (j % 2 ? 0 : 1)); if (x > lx1 + 0.01) continue;
+      if (may && j !== 1) continue; lettuce(x, z); } });
+  if (may) {
+    // cherry tomatoes, staked and mulched, in the back row's gaps
+    for (const f of [0.28, 0.72]) {
+      const x = lx0 + (lx1 - lx0) * f, z = rowsZ[0];
+      p.put("#d9c08a", "fabric", "disc", x, y + 0.004, z, 0.1, 0.25, 0.1);
+      p.stalk("#c9a96e", x, y, z, 1.25, 0.008);
+      for (let k = 0; k < 9; k++) { const hy = 0.18 + k * 0.1, a = r() * 6.3; p.put(k % 2 ? "#4e7d3a" : "#5f8f43", "plastic", "ico0", x + Math.cos(a) * 0.06, y + hy, z + Math.sin(a) * 0.06, 0.065, 0.05, 0.065, r() * 3, r() * 3, 0); }
+      for (let k = 0; k < 14; k++) { const hy = 0.3 + r() * 0.7, a = r() * 6.3; p.put(r() < 0.75 ? "#d8312a" : "#e8a03a", "ceramic", "ico1", x + Math.cos(a) * 0.09, y + hy, z + Math.sin(a) * 0.09, 0.013); }
+    }
+    // chard: rosettes of glossy leaves on red and yellow stems
+    [0.15, 0.5, 0.85].forEach((f, n) => {
+      const x = lx0 + (lx1 - lx0) * f, z = rowsZ[2], stem = n % 2 ? "#e6b422" : "#c0293a";
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + r() * 0.4, dx = Math.cos(a) * 0.09, dz = Math.sin(a) * 0.09;
+        p.stalk(stem, x, y, z, 0.17, 0.006, dx * 0.6, dz * 0.6);
+        p.put("#3f7a3a", "plastic", "ico1", x + dx, y + 0.22, z + dz, 0.05, 0.13, 0.016, Math.sin(a) * 0.5, -a + Math.PI / 2, Math.cos(a) * 0.5); }
+    });
+  }
+  // cosmos: tall wiry stems, pink, white and magenta flowers
+  for (let i = 0; i < 16; i++) {
+    const x = xC0 + 0.03 + r() * (X0 + W - xC0 - 0.06), z = zA0 + 0.04 + r() * (zA1 - zA0 - 0.08), h = (may ? 0.6 : 0.4) + r() * 0.35, dx = (r() - 0.5) * 0.12, dz = (r() - 0.5) * 0.12;
+    p.stalk("#5e8f3e", x, y, z, h, 0.004, dx, dz);
+    for (let k = 0; k < 3; k++) p.stalk("#79a94f", x + dx * 0.4, y + h * (0.3 + k * 0.2), z + dz * 0.4, 0.08, 0.002, (r() - 0.5) * 0.1, (r() - 0.5) * 0.1);
+    const col = ["#e46fa8", "#f2eef0", "#c2306f", "#f39cc4"][i % 4];
+    p.put(col, "paper", "disc", x + dx, y + h, z + dz, 0.032, 0.05, 0.032, (r() - 0.5) * 0.6, 0, (r() - 0.5) * 0.6);
+    p.put("#f0c419", "plastic", "ico0", x + dx, y + h + 0.008, z + dz, 0.009);
+  }
+  // onions: two rows of 23, bulbs shouldering out of the soil
+  for (const f of [0.5, 0.7]) { const z = Z0 + f * kz;
+    for (let i = 0; i < 23; i++) { const x = X0 + (i + 0.5) * W / 23;
+      p.put("#d99a52", "ceramic", "ico1", x, y + 0.012, z, 0.021, 0.018, 0.021);
+      for (let k = 0; k < 2; k++) p.stalk("#5f9a3e", x, y + 0.02, z, 0.16 + r() * 0.08, 0.0035, (r() - 0.5) * 0.06, (r() - 0.5) * 0.06); } }
+  // carrots and radishes, one mixed row
+  { const z = Z0 + 0.9 * kz, n = Math.round(W / 0.024);
+    for (let i = 0; i < n; i++) { const x = X0 + (i + 0.5) * W / n;
+      if (i % 3 === 2) { p.put("#d6406e", "ceramic", "ico1", x, y + 0.008, z + 0.03, 0.015); p.put("#78b04a", "plastic", "ico0", x, y + 0.05, z + 0.03, 0.02, 0.04, 0.008, 0, r() * 3, 0); }
+      else { p.put("#e8772e", "ceramic", "cone", x, y + 0.006, z - 0.01, 0.011, 0.03, 0.011, Math.PI); for (let k = 0; k < 3; k++) p.stalk("#5f9e36", x, y + 0.01, z - 0.01, 0.15 + r() * 0.07, 0.0025, (r() - 0.5) * 0.08, (r() - 0.5) * 0.08); } } }
+  // strawberries on straw
+  { const z0 = Z0 + 1.0 * kz, z1 = Z0 + Dd;
+    p.put("#d8bf86", "fabric", "box", X0 + W / 2, y + 0.008, (z0 + z1) / 2, W, 0.016, z1 - z0);
+    for (let i = 0; i < 60; i++) p.put("#e3cc90", "plastic", "cyl", X0 + r() * W, y + 0.018, z0 + r() * (z1 - z0), 0.002, 0.09, 0.002, Math.PI / 2, r() * 3, 0);
+    const n = Math.max(3, Math.round(W / 0.19));
+    for (let i = 0; i < n; i++) { const x = X0 + (i + 0.5) * W / n, z = (z0 + z1) / 2;
+      for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + r(); p.put(k % 2 ? "#3f7e3a" : "#4f8f42", "plastic", "ico1", x + Math.cos(a) * 0.05, y + 0.05, z + Math.sin(a) * 0.05, 0.04, 0.012, 0.04, 0, a, 0.3); }
+      for (let k = 0; k < 4; k++) { const a = r() * 6.3; p.put("#d42a2a", "ceramic", "cone", x + Math.cos(a) * 0.08, y + 0.03, z + Math.sin(a) * 0.08, 0.012, 0.026, 0.012, Math.PI); }
+      for (let k = 0; k < 2; k++) { const a = r() * 6.3; p.put("#fbfaf4", "paper", "disc", x + Math.cos(a) * 0.04, y + 0.075, z + Math.sin(a) * 0.04, 0.011, 0.05, 0.011); }
+    } }
+  p.done();
+}
+// a planted border: bark mulch, lavender, coneflowers, grasses and white daisies, tallest at the back (-z)
+function buildFlowerbed(g, it, mats) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, p = planter(g);
+  blk(g, makeMat("#5a4030", "fabric"), -w / 2, w / 2, 0, 0.03, -d / 2, d / 2, 0.01);
+  blk(g, makeMat("#6c6f72", "metal"), -w / 2, w / 2, 0, 0.06, d / 2 - 0.006, d / 2);           // steel edging
+  let seed = (it.id ?? "f").length * 71 + 5; const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let x = -w / 2 + 0.15; x < w / 2 - 0.1; x += 0.3 + r() * 0.15) {
+    const kind = Math.floor(r() * 4), z = (r() - 0.5) * d * 0.5, back = -d * 0.15;
+    if (kind === 0) {             // lavender: grey-green cushion with purple spikes
+      p.put("#8a9a7a", "plastic", "ico1", x, 0.12, z + 0.05, 0.14, 0.1, 0.14);
+      for (let k = 0; k < 16; k++) { const a = r() * 6.3, rr = r() * 0.1; p.stalk("#8a9a7a", x + Math.cos(a) * rr, 0.15, z + 0.05 + Math.sin(a) * rr, h * 0.45, 0.003, Math.cos(a) * 0.05, Math.sin(a) * 0.05);
+        p.put("#7b5fb0", "plastic", "cyl", x + Math.cos(a) * (rr + 0.05), 0.15 + h * 0.45, z + 0.05 + Math.sin(a) * (rr + 0.05), 0.012, 0.07, 0.012); }
+    } else if (kind === 1) {      // coneflowers
+      for (let k = 0; k < 5; k++) { const ox = (r() - 0.5) * 0.2, oz = back + (r() - 0.5) * 0.15, hh = h * (0.7 + r() * 0.3);
+        p.stalk("#4f7d3a", x + ox, 0.02, z + oz, hh, 0.005); p.put("#d9659a", "paper", "disc", x + ox, 0.02 + hh, z + oz, 0.045, 0.06, 0.045, 0.3, 0, 0); p.put("#7a3e1e", "plastic", "ico1", x + ox, 0.03 + hh, z + oz, 0.014); }
+      p.put("#4f7d3a", "plastic", "ico1", x, 0.1, z + back, 0.12, 0.09, 0.1);
+    } else if (kind === 2) {      // ornamental grass
+      for (let k = 0; k < 18; k++) { const a = r() * 6.3; p.stalk(k % 2 ? "#b9b46a" : "#9aa65a", x, 0.02, z + back, h * (0.7 + r() * 0.4), 0.003, Math.cos(a) * 0.15, Math.sin(a) * 0.15); }
+    } else {                      // white daisies in front
+      p.put("#5e8a44", "plastic", "ico1", x, 0.09, z + 0.08, 0.13, 0.08, 0.11);
+      for (let k = 0; k < 9; k++) { const a = r() * 6.3, rr = r() * 0.1; p.put("#fbfaf4", "paper", "disc", x + Math.cos(a) * rr, 0.17 + r() * 0.08, z + 0.08 + Math.sin(a) * rr, 0.03, 0.05, 0.03); p.put("#f0c419", "plastic", "ico0", x + Math.cos(a) * rr, 0.185 + r() * 0.08, z + 0.08 + Math.sin(a) * rr, 0.008); }
+    }
+  }
+  p.done();
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+// slatted wooden compost bin with a heap showing
+function buildCompost(g, it, mats) {
+  const w = it.w / 100, d = it.d / 100, h = it.h / 100, wood = mats.main;
+  for (let y = 0.04; y < h - 0.05; y += 0.13) {
+    blk(g, wood, -w / 2, w / 2, y, y + 0.09, -d / 2, -d / 2 + 0.025); blk(g, wood, -w / 2, w / 2, y, y + 0.09, d / 2 - 0.025, d / 2);
+    blk(g, wood, -w / 2, -w / 2 + 0.025, y, y + 0.09, -d / 2, d / 2); blk(g, wood, w / 2 - 0.025, w / 2, y, y + 0.09, -d / 2, d / 2);
+  }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) blk(g, makeMat(it.colour2 ?? "#6e5038", "wood"), sx * w / 2 - (sx > 0 ? 0.05 : 0), sx * w / 2 + (sx > 0 ? 0 : 0.05), 0, h, sz * d / 2 - (sz > 0 ? 0.05 : 0), sz * d / 2 + (sz > 0 ? 0 : 0.05));
+  const heap = mesh(g, new THREE.SphereGeometry(Math.min(w, d) / 2 - 0.05, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), makeMat("#4a3626", "fabric"), h - 0.22);
+  heap.scale.y = 0.5;
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+// a run of round stepping stones across the lawn (local x is the walking direction)
+function buildStepStones(g, it, mats) {
+  const w = it.w / 100, d = it.d / 100, n = Math.max(1, Math.round(w / 0.55));
+  let seed = (it.id ?? "s").length * 37 + 11; const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < n; i++) {
+    const x = -w / 2 + (i + 0.5) * w / n, rad = Math.min(d / 2, 0.24) * (0.88 + r() * 0.12);
+    const s = mesh(g, new THREE.CylinderGeometry(rad, rad * 1.04, 0.045, 11), makeMat(["#a8a49c", "#b6b1a7", "#9d988f"][i % 3], "ceramic"), 0.0);
+    s.position.x = x; s.position.z = (r() - 0.5) * (d - 2 * rad) * 0.6; s.rotation.y = r() * 3; s.scale.set(1, 1, 0.82 + r() * 0.18);
+    s.material.roughness = 0.85;
+  }
+  return [[-w / 2, -d / 2, w / 2, d / 2]];
+}
+// stone bird bath: pedestal, bowl, a little water
+function buildBirdbath(g, it, mats) {
+  const w = it.w / 100, h = it.h / 100, stone = makeMat(it.colour ?? "#bdb8ad", "ceramic"); stone.roughness = 0.9;
+  mesh(g, new THREE.LatheGeometry([[0.001, 0], [w * 0.32, 0], [w * 0.3, 0.05], [w * 0.12, 0.1], [w * 0.1, h - 0.12], [w * 0.18, h - 0.08], [0.001, h - 0.08]].map(([a, b]) => new THREE.Vector2(a, b)), 20), stone, 0);
+  mesh(g, new THREE.LatheGeometry([[0.001, h - 0.08], [w * 0.48, h - 0.04], [w * 0.5, h], [w * 0.44, h - 0.005], [0.001, h - 0.04]].map(([a, b]) => new THREE.Vector2(a, b)), 28), stone, 0);
+  const water = mesh(g, new THREE.CircleGeometry(w * 0.43, 24), new THREE.MeshPhysicalMaterial({ color: 0x3e7c82, roughness: 0.05, transparent: true, opacity: 0.7, clippingPlanes: [cutPlane] }), h - 0.02);
+  water.rotation.x = -Math.PI / 2; water.castShadow = false;
+  return [[-w / 2, -w / 2, w / 2, w / 2]];
+}
 function buildRaisedBed(g, it, mats) {
   const w = it.w / 100, d = it.d / 100, h = it.h / 100, t = 0.04;
   const wood = mats.main, soil = makeMat("#4a3728", "fabric");
@@ -1501,6 +1663,12 @@ function buildRaisedBed(g, it, mats) {
     blk(g, wood, -w / 2, -w / 2 + t, y, y1, -d / 2 + t, d / 2 - t); blk(g, wood, w / 2 - t, w / 2, y, y1, -d / 2 + t, d / 2 - t);
   }
   blk(g, soil, -w / 2 + t, w / 2 - t, h - 0.1, h - 0.04, -d / 2 + t, d / 2 - t);
+  const planting = styleOf(it).planting;
+  if (planting === "carre-spring" || planting === "carre-may") {
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) blk(g, wood, sx * w / 2 - 0.035, sx * w / 2 + 0.035, 0, h + 0.05, sz * d / 2 - 0.035, sz * d / 2 + 0.035, 0.008);
+    plantCarre(g, it, h - 0.04, planting === "carre-may");
+    return [[-w / 2, -d / 2, w / 2, d / 2]];
+  }
   const greens = ["#5d8c4a", "#7fae5a", "#3f6e3a", "#8fbf6a"].map((c) => makeMat(c, "plastic"));
   let seed = (it.id ?? "rb").length * 97 + 13; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const cols = Math.max(2, Math.round((w - 0.2) / 0.28)), rows = Math.max(1, Math.round((d - 0.2) / 0.28));
@@ -1596,7 +1764,8 @@ function buildItem(it) {
     pendant: buildPendant, plant: buildPlant, deco: buildDeco, daybed: buildDaybed, pegboard: buildPegboard,
     wallshelf: buildWallShelf, curtain: buildCurtain, officechair: buildOfficeChair, monitor: buildMonitor,
     aquarium: buildAquarium, raisedbed: buildRaisedBed, brewkettle: buildBrewKettle, fermenter: buildFermenter, guitar: buildGuitar,
-    trainerbike: buildTrainerBike, tvstand: buildTvStand }[it.type];
+    trainerbike: buildTrainerBike, tvstand: buildTvStand,
+    flowerbed: buildFlowerbed, compost: buildCompost, stepstones: buildStepStones, birdbath: buildBirdbath }[it.type];
   let rects;
   if (fn) rects = fn(g, it, mats, st);
   else { blk(g, main, -it.w / 200, it.w / 200, 0, it.h / 100, -it.d / 200, it.d / 200); rects = [[-it.w / 200, -it.d / 200, it.w / 200, it.d / 200]]; }
@@ -1643,7 +1812,7 @@ function surfaceTop(o) {
     case "officechair": return y + 0.5;
     case "raisedbed": return y + h - 0.04;
     case "pendant": case "lamp": case "tablelamp": case "plant": case "pegboard": case "curtain": case "monitor":
-    case "aquarium": case "brewkettle": case "fermenter": case "guitar": case "trainerbike": case "tvstand": return null;
+    case "aquarium": case "brewkettle": case "fermenter": case "guitar": case "trainerbike": case "tvstand": case "flowerbed": case "birdbath": return null;
     default: return y + h;
   }
 }
@@ -1717,7 +1886,7 @@ function collisions(it, x = it.x, z = it.z, rot = it.rot) {
   const out = new Set();
   const rects = worldRects(it, x, z, rot);
   const [y0, y1] = collRange(it);
-  const others = items.filter((o) => o.id !== it.id && o.type !== "rug").map((o) => ({ o, rs: worldRects(o), bb: aabb(worldRects(o)), y0: collRange(o)[0], y1: collRange(o)[1] }));
+  const others = items.filter((o) => o.id !== it.id && !flatType(o.type)).map((o) => ({ o, rs: worldRects(o), bb: aabb(worldRects(o)), y0: collRange(o)[0], y1: collRange(o)[1] }));
   const step = 0.04, pad = 0.01;
   for (const r of rects) {
     const [x0, z0, x1, z1] = r.local;
@@ -1870,7 +2039,7 @@ function tint(g, bad) {
   });
 }
 function statusOf(it) {
-  if (it.type === "rug") return { cls: "ok", text: "Fits" };
+  if (flatType(it.type)) return { cls: "ok", text: "Fits" };
   const c = collisions(it);
   if (c.has("wall")) return { cls: "bad", text: "Hits a wall" };
   if (c.has("fixture")) return { cls: "bad", text: "Hits a fixture" };
@@ -2010,7 +2179,7 @@ function setSrcChip(src, note) {
   $("dNote").textContent = note ?? "";
 }
 // ---- style controls (filled from the photo, a catalogue preset or by hand)
-const STYLE_LABELS = { material: "Material", legs: "Legs", legHeight: "Leg height cm", arms: "Arms", back: "Back", seatCushions: "Seat cushions", lsection: "L-section",
+const STYLE_LABELS = { material: "Material", legs: "Legs", legHeight: "Leg height cm", arms: "Arms", back: "Back", seatCushions: "Seat cushions", lsection: "L-section", planting: "Planting",
   headboard: "Headboard", top: "Top", topThick: "Top thickness cm", fronts: "Fronts", handles: "Handles", shade: "Shade", profile: "Shape", foliage: "Foliage" };
 const NUMERIC = { legHeight: [0, 60], topThick: [1, 15], seatCushions: [1, 6] };
 const pretty = (v) => String(v).replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
@@ -2532,7 +2701,7 @@ function updatePending() {
   settle(pending);
   pending.group.position.set(pending.x, elevM(pending), pending.z);
   pending.group.rotation.y = pending.rot * Math.PI / 180;
-  tint(pending.group, pending.type !== "rug" && collisions(pending).size > 0);
+  tint(pending.group, !flatType(pending.type) && collisions(pending).size > 0);
   updateSelectionVisuals();
 }
 function cancelPlacing() {
@@ -2584,7 +2753,7 @@ view.addEventListener("pointermove", (e) => {
     settle(it);
     placeGroup(it);
     moveRiders(it, dragRiders);
-    tint(groups.get(it.id), it.type !== "rug" && collisions(it).size > 0);
+    tint(groups.get(it.id), !flatType(it.type) && collisions(it).size > 0);
     updateSelectionVisuals();
     presence({ drag: { id: it.id, x: +it.x.toFixed(3), y: +elevM(it).toFixed(3), z: +it.z.toFixed(3), rot: it.rot } });
   }
