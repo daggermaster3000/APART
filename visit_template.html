@@ -191,6 +191,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
@@ -291,18 +292,36 @@ function lawn() {
     for (let i = 0; i < 26000; i++) { const h = 78 + rnd() * 30, l = 24 + rnd() * 22; x.strokeStyle = `hsla(${h},45%,${l}%,0.75)`; x.lineWidth = 1;
       const px = rnd() * s, py = rnd() * s; x.beginPath(); x.moveTo(px, py); x.lineTo(px + (rnd() - 0.5) * 3, py - 2 - rnd() * 5); x.stroke(); } });
 }
-function facade() { // 3 m storey bands with windows, 1 texture = 6 m
-  return canvasTex(512, (x, s) => { const k = s / 6; x.fillStyle = "#ece9e2"; x.fillRect(0, 0, s, s); noise(x, s, 6);
-    for (const wx of [0.9, 3.9]) for (const wy of [0.7, 3.7]) { x.fillStyle = "#3d4347"; x.fillRect(wx * k, wy * k, 1.3 * k, 1.6 * k);
-      x.fillStyle = "rgba(170,195,215,0.35)"; x.fillRect(wx * k + 4, wy * k + 4, 1.3 * k - 8, 0.6 * k); x.fillStyle = "#cfcac0"; x.fillRect((wx - 0.08) * k, (wy + 1.6) * k, 1.46 * k, 0.07 * k); }
-    x.fillStyle = "rgba(0,0,0,0.08)"; x.fillRect(0, 2.95 * k, s, 0.05 * k); x.fillRect(0, 5.95 * k, s, 0.05 * k); });
+// Swiss render facade as in the street photos: 3 m storeys, bronze frames, external venetian blinds part-lowered.
+// One texture = 6 x 6 m; window rows sit 0.7-2.15 m above each 3 m storey line (world y 0, 3, 6 ...).
+const FAC_WIN = [[0.8, 0.7, 0.55], [3.6, 0.7, 0.2], [0.8, 3.7, 0.35], [3.6, 3.7, 0.75]]; // x, y (m), blind lowered
+function facade(glow) {
+  return canvasTex(512, (x, s) => {
+    const k = s / 6, Y = (m) => s - m * k;            // canvas y from metres above the tile's bottom
+    seed = 41;
+    x.fillStyle = glow ? "#000" : "#efede8"; x.fillRect(0, 0, s, s);
+    if (!glow) { noise(x, s, 5); x.fillStyle = "rgba(0,0,0,0.035)"; for (const yy of [2.95, 5.95]) x.fillRect(0, Y(yy + 0.05), s, 0.05 * k); }
+    FAC_WIN.forEach(([wx, wy, blind], i) => {
+      const w = 1.25, h = 1.45;
+      if (glow) { if (i === 1 || i === 2) { x.fillStyle = "#ffcf8f"; x.fillRect(wx * k, Y(wy + h * (1 - blind)), w * k, h * (1 - blind) * k); } return; }
+      x.fillStyle = "#5b4a3a"; x.fillRect((wx - 0.05) * k, Y(wy + h + 0.05), (w + 0.1) * k, (h + 0.1) * k);    // bronze frame
+      const g = x.createLinearGradient(0, Y(wy + h), 0, Y(wy)); g.addColorStop(0, "#5d7186"); g.addColorStop(1, "#2c3640");
+      x.fillStyle = g; x.fillRect(wx * k, Y(wy + h), w * k, h * k);                                            // glass
+      x.fillStyle = "#5b4a3a"; x.fillRect((wx + w / 2 - 0.03) * k, Y(wy + h), 0.06 * k, h * k);                // mullion
+      const bh = h * blind; x.fillStyle = "#7a7064"; x.fillRect(wx * k, Y(wy + h), w * k, bh * k);              // blind
+      x.fillStyle = "rgba(0,0,0,0.25)"; for (let t = 0; t < bh; t += 0.07) x.fillRect(wx * k, Y(wy + h - t), w * k, 1);
+      x.fillStyle = "#6a6158"; x.fillRect((wx - 0.05) * k, Y(wy + h + 0.17), (w + 0.1) * k, 0.12 * k);         // blind box
+      x.fillStyle = "#d8d4cc"; x.fillRect((wx - 0.1) * k, Y(wy - 0.02), (w + 0.2) * k, 0.06 * k);                // sill
+    });
+  }, { srgb: !glow });
 }
+
 const TX = {
   oak: oakPlanks(false), oakR: oakPlanks(true),
   wet: tiles((l) => `rgb(${Math.round(214 * l)},${Math.round(216 * l)},${Math.round(212 * l)})`, "#a9aaa5", 0.3, 0.6, 1.2),
   paving: tiles((l) => `rgb(${Math.round(186 * l)},${Math.round(178 * l)},${Math.round(164 * l)})`, "#7d776c", 0.4, 0.4, 1.6),
   stair: tiles((l) => `rgb(${Math.round(170 * l)},${Math.round(168 * l)},${Math.round(160 * l)})`, "#8a8880", 0.6, 0.3, 1.2),
-  plaster: plaster("#f1efe9"), lawn: lawn(), facade: facade(),
+  plaster: plaster("#f1efe9"), lawn: lawn(), facade: facade(false), facadeGlow: facade(true),
 };
 // planar UVs from world coordinates, metres -> texture units
 function worldUV(o, scale) {
@@ -675,19 +694,12 @@ function dressModel(root) {
 function addSurroundings(box) {
   // the storeys above: ceiling for this flat, a plain rendered block for the house
   const x0 = box.min.x, x1 = box.max.x, z0 = box.min.z, z1 = box.max.z;
-  const mass = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 9.4, z1 - z0), plainMat({ map: TX.facade, roughness: 0.9 }));
-  mass.position.set((x0 + x1) / 2, INFO.wall_height_m + 4.7, (z0 + z1) / 2);
-  worldUV(mass, 6); mass.castShadow = true; mass.receiveShadow = true;
-  // the ceiling face gets clean plaster instead of the window pattern
+  // the ceiling of this flat; the storeys above are built with the rest of No. 8 (buildHouse8)
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), plainMat({ map: TX.plaster, roughness: 0.95 }));
   ceil.rotation.x = Math.PI / 2; ceil.position.set((x0 + x1) / 2, INFO.wall_height_m - 0.002, (z0 + z1) / 2); worldUV(ceil, 1.6);
   ceil.receiveShadow = true;
-  roofMass = new THREE.Group(); roofMass.add(mass, ceil); world.add(roofMass);
-  // neighbourhood ground, a laurel hedge round the garden
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(160, 48), addVariation(plainMat({ map: TX.lawn, roughness: 1 }), 0.12, 0.5, [1.15, 1.08, 0.75]));
-  ground.rotation.x = -Math.PI / 2; ground.position.set(CENTER.x, -0.22, CENTER.z); worldUV(ground, 2.2); ground.receiveShadow = true;
-  world.add(ground); floorMeshes.push(ground);
-  const leaf = plainMat({ color: 0x3e5a32, roughness: 0.9, map: TX.lawn });
+  roofMass = new THREE.Group(); roofMass.add(ceil); world.add(roofMass);
+  const leaf = plainMat({ color: 0x76a05a, roughness: 0.85, map: TX.lawn });
   const hedge = (ax, az, bx, bz) => { const h = new THREE.Mesh(new RoundedBoxGeometry(Math.max(0.7, bx - ax), 1.7, Math.max(0.7, bz - az), 3, 0.25), leaf);
     h.position.set((ax + bx) / 2, -0.18 + 0.85, (az + bz) / 2); h.castShadow = h.receiveShadow = true; world.add(h); };
   hedge(3.2, -7.4, 16.2, -6.7); hedge(15.5, -7.4, 16.2, -0.2); hedge(3.2, -7.4, 3.9, -0.2); hedge(15.6, 12.9, 16.3, 16.8);
@@ -699,7 +711,7 @@ function addSurroundings(box) {
 // Photo pixels (u right = east, v down = south) map to the plan at 0.204 m/px:
 // the building's east edge (u 400) is x = 0, the garden facade (v 298) is z = 0.
 // =====================================================================
-const solidBoxes = [], photoHide = [];
+const solidBoxes = [], photoHide = [], glowMats = [];
 const AER = { s: 0.204, u0: 400, v0: 298, W: 724, H: 828 };
 const A = (u, v) => [(AER.u0 - u) * AER.s, (AER.v0 - v) * AER.s];   // photo px -> plan x, z
 function paintGround() {
@@ -725,7 +737,7 @@ function paintGround() {
   x.restore();
   poly([[440, 0], [724, 0], [724, 290], [430, 300]], "#7b9a57");                              // gardens of the terraced houses
   poly([[0, 628], [724, 640], [724, 828], [0, 828]], "#2e4126");                              // forest floor
-  const PATH = "#cfcbc1", ROAD = "#bdb9b0";
+  const PATH = "#cfcbc1", ROAD = "#76787a";
   line([[0, 25], [120, 80], [210, 125], [300, 165], [335, 180]], 17, ROAD);                    // Ahornallee
   line([[335, 180], [400, 180], [412, 150], [415, 0]], 14, ROAD);
   line([[412, 180], [412, 300]], 17, ROAD);                                                     // the lane east of the house
@@ -753,7 +765,7 @@ function roofTex(kind) {
 const nbMats = {};
 function nbMat(kind) {
   if (nbMats[kind]) return nbMats[kind];
-  const facade = (col) => plainMat({ map: TX.facade, color: col, roughness: 0.9 });
+  const facade = (col) => { const m = plainMat({ map: TX.facade, color: col, roughness: 0.9, emissive: 0xffffff, emissiveMap: TX.facadeGlow, emissiveIntensity: 0 }); glowMats.push(m); return m; };
   return (nbMats[kind] = {
     wallLight: () => facade(0xffffff), wallWarm: () => facade(0xf1e6d6), wallGrey: () => facade(0xd9dadb),
     scaffold: () => plainMat({ map: roofTex("site"), roughness: 0.95, color: 0xd8d4cb }),
@@ -782,36 +794,172 @@ function block(u0, v0, u1, v1, h, wall, roof, pitch = 0) {
   solidBoxes.push([x0, z0, x1, z1]);
   world.add(g); return g;
 }
+// the site is flat around the house and to the south; the lane and the blocks to the north step downhill
+const terrainY = (x, z) => -0.205 - Math.min(6, Math.max(0, z - 23) * 0.07);
+function terrainMesh(x0, z0, x1, z1, nx, nz, mat, dy, uvFn) {
+  const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0, nx, nz); geo.rotateX(-Math.PI / 2); geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
+  const p = geo.attributes.position, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, terrainY(x, z) + dy); if (uvFn) uv.setXY(i, ...uvFn(x, z)); }
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; world.add(m); floorMeshes.push(m); return m;
+}
+// ---- the parts of No. 8 seen in the street photos
+const STOREY = 3.0, ROOF = 8.8;
+const concrete = () => plainMat({ map: TX.plaster, color: 0xf3f1ec, roughness: 0.85 });
+const barGeos = [];
+function bars(x0, z0, x1, z1, y) { // one railing run of 2 cm vertical bars, 11 cm apart, with a top rail
+  const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.round(len / 0.11));
+  for (let i = 0; i <= n; i++) { const g = new THREE.BoxGeometry(0.022, 1.0, 0.022); g.translate(x0 + (x1 - x0) * i / n, y + 0.5, z0 + (z1 - z0) * i / n); barGeos.push(g); }
+  const top = new THREE.BoxGeometry(Math.abs(x1 - x0) + 0.04, 0.04, Math.abs(z1 - z0) + 0.04); top.translate((x0 + x1) / 2, y + 1.02, (z0 + z1) / 2); barGeos.push(top);
+}
+// a cantilevered balcony: slab, railings on the open sides (n/s/e/w), awning box under the front edge
+function balcony(g, x0, x1, z0, z1, y, open) {
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.22, z1 - z0), concrete());
+  slab.position.set((x0 + x1) / 2, y - 0.11, (z0 + z1) / 2); g.add(slab); g.updateMatrixWorld(true); worldUV(slab, 1.6); slab.castShadow = slab.receiveShadow = true;
+  const e = 0.04;
+  if (open.includes("s")) bars(x0 + e, z0 + e, x1 - e, z0 + e, y);
+  if (open.includes("n")) bars(x0 + e, z1 - e, x1 - e, z1 - e, y);
+  if (open.includes("w")) bars(x1 - e, z0 + e, x1 - e, z1 - e, y);
+  if (open.includes("e")) bars(x0 + e, z0 + e, x0 + e, z1 - e, y);
+  const front = open.includes("s") ? "s" : open.includes("n") ? "n" : open.includes("w") ? "w" : "e", alongX = front === "s" || front === "n";
+  const box = new THREE.Mesh(new THREE.BoxGeometry(alongX ? x1 - x0 - 0.2 : 0.14, 0.12, alongX ? 0.14 : z1 - z0 - 0.2), plainMat({ color: 0x8d8a85, roughness: 0.5, metalness: 0.4 }));
+  box.position.set(front === "w" ? x1 - 0.1 : front === "e" ? x0 + 0.1 : (x0 + x1) / 2, y - 0.3, front === "s" ? z0 + 0.1 : front === "n" ? z1 - 0.1 : (z0 + z1) / 2); g.add(box);
+}
+function stack(g, x0, x1, z0, z1, floors, open, canopy = true, roofY = ROOF) {
+  for (const f of floors) balcony(g, x0, x1, z0, z1, f * STOREY - 0.2, open);
+  if (canopy) { const c = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.3, z1 - z0), concrete()); c.position.set((x0 + x1) / 2, roofY - 0.15, (z0 + z1) / 2); g.add(c); g.updateMatrixWorld(true); worldUV(c, 1.6); c.castShadow = c.receiveShadow = true; }
+}
+function flatRoof(g, x0, x1, z0, z1, y, solar) {
+  const fascia = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 + 0.3, 0.34, z1 - z0 + 0.3), concrete());
+  fascia.position.set((x0 + x1) / 2, y + 0.03, (z0 + z1) / 2); g.add(fascia); fascia.castShadow = true;
+  const fill = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 - 0.3, 0.05, z1 - z0 - 0.3), solar ? nbMat("solar") : plainMat({ color: 0x8f8d86, roughness: 1 }));
+  fill.position.set((x0 + x1) / 2, y + 0.2, (z0 + z1) / 2); g.add(fill);
+  g.updateMatrixWorld(true); worldUV(fascia, 1.6); worldUV(fill, 5);
+}
+function railMesh(g) {
+  if (!barGeos.length) return;
+  const r = new THREE.Mesh(mergeGeometries(barGeos, false), plainMat({ color: 0x4a3f35, roughness: 0.45, metalness: 0.5 }));
+  barGeos.length = 0; r.castShadow = true; g.add(r);
+}
+function buildHouse8(box) {
+  const g = new THREE.Group(); roofMass.add(g);
+  const x0 = box.min.x, x1 = box.max.x, z0 = box.min.z, z1 = box.max.z, zN = (AER.v0 - 188) * AER.s;
+  const wall = nbMat("wallLight");
+  const mass = (ax, az, bx, bz, y0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bx - ax, ROOF - y0, bz - az), wall);
+    m.position.set((ax + bx) / 2, (ROOF + y0) / 2, (az + bz) / 2); g.add(m); g.updateMatrixWorld(true); worldUV(m, 6); m.castShadow = m.receiveShadow = true; };
+  mass(x0, z0, x1, z1, INFO.wall_height_m);                                         // the two storeys over our flat
+  mass(x0, z1, 11.0, zN, terrainY(0, zN) - 0.8); mass(11.0, 16.9, x1, zN, terrainY(0, zN) - 0.8);   // the flats to the north
+  solidBoxes.push([x0, z1, 11.0, zN], [11.0, 16.9, x1, zN]);
+  flatRoof(g, x0, x1, z0, zN, ROOF, true);
+  // balconies, as in the photos: two staggered stacks over the garden, one on the street corner, one on the west side
+  stack(g, 10.7, x1 + 0.3, z0 - 2.1, z0, [1, 2], "sew");
+  stack(g, 4.4, 8.6, z0 - 1.7, z0, [1, 2], "sew");
+  stack(g, x0 - 1.8, x0, 0.0, 3.6, [1, 2], "se");
+  stack(g, x1, x1 + 1.8, 17.4, 21.2, [1, 2], "wsn");
+  railMesh(g);
+  // the entrance: concrete canopy over the glass doors, bronze portal and the house number
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.26, 4.6), concrete()); canopy.position.set(x0 - 0.95, 2.62, 5.4); g.add(canopy); g.updateMatrixWorld(true); worldUV(canopy, 1.6); canopy.castShadow = true;
+  const bronze = plainMat({ color: 0x5b4a3a, roughness: 0.4, metalness: 0.5 });
+  for (const zz of [4.9, 5.92]) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.35, 0.08), bronze); post.position.set(x0 + 0.08, 1.0, zz); g.add(post); }
+  const c = document.createElement("canvas"); c.width = 128; c.height = 128; const cx = c.getContext("2d");
+  cx.fillStyle = "#5b4a3a"; cx.fillRect(0, 0, 128, 128); cx.fillStyle = "#efe9de"; cx.font = "600 96px Karla, sans-serif"; cx.textAlign = "center"; cx.fillText("8", 64, 100);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const num = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.28), plainMat({ map: tex, roughness: 0.5 }));
+  num.position.set(x0 - 0.01, 2.05, 6.2); num.rotation.y = -Math.PI / 2; g.add(num);
+  // the beech hedge along the lane, with the gap for the entrance path
+  const beech = plainMat({ color: 0x86b066, roughness: 0.85, map: TX.lawn });
+  const hedge = (ax, az, bx, bz, h) => { const m = new THREE.Mesh(new RoundedBoxGeometry(bx - ax, h, bz - az, 3, 0.2), beech); m.position.set((ax + bx) / 2, terrainY((ax + bx) / 2, (az + bz) / 2) + h / 2, (az + bz) / 2); m.castShadow = m.receiveShadow = true; world.add(m); };
+  hedge(x0 - 1.7, -6.6, x0 - 0.9, 3.7, 1.5); hedge(x0 - 1.7, 7.4, x0 - 0.9, zN, 1.6);
+}
+// neighbours: the same white three-storey blocks with balconies, stepping down the lane
+function aptBlock(u0, v0, u1, v1, storeys = 3, solar = true) {
+  const [xa, za] = A(u0, v0), [xb, zb] = A(u1, v1);
+  const x0 = Math.min(xa, xb), x1 = Math.max(xa, xb), z0 = Math.min(za, zb), z1 = Math.max(za, zb);
+  const base = terrainY((x0 + x1) / 2, (z0 + z1) / 2) + 0.2, H = storeys * STOREY - 0.2;
+  const g = new THREE.Group(); g.position.y = base; world.add(g);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, H + 1.2, z1 - z0), nbMat("wallLight"));
+  body.position.set((x0 + x1) / 2, H / 2 - 0.6, (z0 + z1) / 2); g.add(body); g.updateMatrixWorld(true); worldUV(body, 6);
+  flatRoof(g, x0, x1, z0, z1, H, solar);
+  const along = x1 - x0 > z1 - z0, floors = Array.from({ length: storeys - 1 }, (_, i) => i + 1);
+  for (const t of [0.12, 0.58]) {   // two staggered stacks on the long sunny face
+    const L = along ? x1 - x0 : z1 - z0, a = (along ? x0 : z0) + L * t, b = a + Math.min(4.2, L * 0.3);
+    if (along) stack(g, a, b, z0 - 1.8, z0, floors, "sew", true, H); else stack(g, x1, x1 + 1.8, a, b, floors, "wsn", true, H);
+  }
+  railMesh(g);
+  const near = Math.hypot((x0 + x1) / 2 - CENTER.x, (z0 + z1) / 2 - CENTER.z) < 40;
+  g.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = near; } });
+  solidBoxes.push([x0, z0, x1, z1]);
+}
+// the Jura: forested ridges on the horizon, hazed by distance (unlit, tinted with the sky in setClock)
+const ridgeMats = [];
+function addRidges() {
+  for (const [R, Hm, haze, a0, a1] of [[300, 70, 0.5, -2.2, 2.1], [385, 98, 0.7, -2.6, 2.6]]) {
+    const pos = [], idx = [], N = 160; seed = 61 + R;
+    for (let i = 0; i <= N; i++) {
+      const a = a0 + (a1 - a0) * i / N, h = Hm * (0.55 + 0.25 * Math.sin(a * 3.1 + R) + 0.12 * Math.sin(a * 9.7) + 0.08 * rnd());
+      const x = CENTER.x - Math.sin(a) * R * 0.9, z = CENTER.z + Math.cos(a) * R;   // centred on north (+z)
+      pos.push(x, -20, z, x, h, z);
+      if (i) { const k = i * 2; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); }
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x2e4a2c, fog: false, side: THREE.DoubleSide });
+    mat.userData.haze = haze; ridgeMats.push(mat);
+    const m = new THREE.Mesh(geo, mat); world.add(m); photoHide.push(m);
+  }
+}
+// tall meadow grass round the house (the photos show it unmown), and the Scots pine on the west lawn
+function addMeadow() {
+  const blades = [];
+  seed = 91;
+  for (let b = 0; b < 7; b++) { const a = b / 7 * Math.PI * 2, r = 0.05, lean = 0.12 + rnd() * 0.12, h = 0.35 + rnd() * 0.3;
+    const bx = Math.cos(a) * r, bz = Math.sin(a) * r;
+    blades.push(bx - 0.012, 0, bz, bx + 0.012, 0, bz, bx + Math.cos(a) * lean, h, bz + Math.sin(a) * lean); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(blades, 3)); geo.computeVertexNormals();
+  const zones = [[16.6, -6.4, 27, 25, 2600], [1.5, -14.5, 28, -9.6, 1800], [-8, -14.5, 1.5, -6.8, 500], [16.6, -14.5, 28, -6.4, 600]];
+  const total = zones.reduce((a, z) => a + z[4], 0);
+  const grass = new THREE.InstancedMesh(geo, plainMat({ color: 0xffffff, roughness: 0.95, side: THREE.DoubleSide }), total);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(); let i = 0; seed = 71;
+  for (const [ax, az, bx, bz, n] of zones) for (let k = 0; k < n; k++) {
+    const x = ax + rnd() * (bx - ax), z = az + rnd() * (bz - az), sc = 0.7 + rnd() * 0.9;
+    q.setFromEuler(new THREE.Euler(0, rnd() * 6.3, 0)); m4.compose(new THREE.Vector3(x, terrainY(x, z), z), q, new THREE.Vector3(sc, sc * (0.8 + rnd() * 0.6), sc));
+    grass.setMatrixAt(i, m4); c.setHSL(0.17 + rnd() * 0.08, 0.45 + rnd() * 0.2, 0.28 + rnd() * 0.16); grass.setColorAt(i, c); i++;
+  }
+  grass.receiveShadow = true; world.add(grass); photoHide.push(grass);
+  // Scots pine: tall bare trunk, a loose crown up top
+  const pine = new THREE.Group(); pine.position.set(19.2, terrainY(19.2, -2.8), -2.8); world.add(pine);
+  const bark = plainMat({ color: 0x9a6a48, roughness: 0.95 }), needles = plainMat({ color: 0x6f9a62, roughness: 0.85, map: TX.lawn });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.2, 10, 8), bark); trunk.position.y = 5; trunk.rotation.z = 0.03; pine.add(trunk);
+  seed = 81;
+  // whorls of short branches tipped with needle clusters, sparse low down, fuller near the top
+  for (let k = 0; k < 34; k++) {
+    const y = 3.6 + k * 0.2 + rnd() * 0.25, reach = (1.7 - k * 0.035) * (0.5 + rnd() * 0.6), a = rnd() * 6.3;
+    const tip = new THREE.Vector3(Math.cos(a) * reach, y + 0.25, Math.sin(a) * reach);
+    const br = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.04, reach, 5), bark);
+    br.position.set(tip.x / 2, y + 0.12, tip.z / 2); br.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(tip.x, 0.25, tip.z).normalize()); pine.add(br);
+    const tuft = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32 + rnd() * 0.28, 1), needles);
+    tuft.scale.set(1.25, 0.7, 1.25); tuft.position.copy(tip); pine.add(tuft);
+  }
+  pine.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+  solidBoxes.push([18.9, -3.1, 19.5, -2.5]);
+}
 function addNeighbourhood(box) {
-  // ground: the photo's layout repainted, a little below our own garden
+  // ground: the aerial photo's layout repainted on terrain that falls away to the north, wider lawn beyond
   const [gx0, gz0] = A(0, 0), [gx1, gz1] = A(AER.W, AER.H);
-  const geo = new THREE.PlaneGeometry(Math.abs(gx1 - gx0), Math.abs(gz1 - gz0), 1, 1);
-  const ground = new THREE.Mesh(geo, plainMat({ map: paintGround(), roughness: 0.95 }));
-  ground.rotation.x = -Math.PI / 2; ground.position.set((gx0 + gx1) / 2, -0.205, (gz0 + gz1) / 2);
-  ground.updateMatrixWorld(true);
-  const p = geo.attributes.position, uv = geo.attributes.uv, v = new THREE.Vector3();
-  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(ground.matrixWorld); uv.setXY(i, (AER.u0 - v.x / AER.s) / AER.W, 1 - (AER.v0 - v.z / AER.s) / AER.H); }
-  ground.receiveShadow = true; world.add(ground); floorMeshes.push(ground);
-  // the rest of No. 8: the units north of ours, same height as the storeys above us (the north terrace stays open)
-  const top = INFO.wall_height_m + 9.4;
-  const rest = (x0, z0, x1, z1) => { const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, top + 0.2, z1 - z0), nbMat("wallLight"));
-    m.position.set((x0 + x1) / 2, top / 2 - 0.1, (z0 + z1) / 2); worldUV(m, 6); m.castShadow = m.receiveShadow = true; world.add(m); solidBoxes.push([x0, z0, x1, z1]); };
-  const zN = (AER.v0 - 188) * AER.s;
-  rest(box.min.x, box.max.z, 11.0, zN); rest(11.0, 16.9, box.max.x, zN);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(box.max.x - box.min.x + 0.4, 0.3, zN - box.min.z + 0.4), nbMat("solar"));
-  roof.position.set((box.min.x + box.max.x) / 2, top + 0.15, (box.min.z + zN) / 2); worldUV(roof, 5); world.add(roof);
-  // terraced houses to the east (solar roofs and red tiles, as in the photo)
-  block(458, 72, 500, 196, 7.2, "wallWarm", "solar", 2.6);
-  block(458, 0, 500, 22, 7.2, "wallWarm", "solar", 2.6);
-  block(583, 0, 627, 84, 7.2, "wallLight", "solar", 2.6);
-  block(583, 104, 627, 200, 7.2, "wallLight", "tile", 2.8);
-  block(680, 30, 724, 132, 7.2, "wallWarm", "solar", 2.6);
-  block(680, 172, 724, 266, 7.2, "wallLight", "tile", 2.8);
+  terrainMesh(Math.min(gx0, gx1), Math.min(gz0, gz1), Math.max(gx0, gx1), Math.max(gz0, gz1), 74, 84,
+    plainMat({ map: paintGround(), roughness: 0.95 }), 0, (x, z) => [(AER.u0 - x / AER.s) / AER.W, 1 - (AER.v0 - z / AER.s) / AER.H]);
+  const outer = terrainMesh(CENTER.x - 450, CENTER.z - 450, CENTER.x + 450, CENTER.z + 450, 60, 60, addVariation(plainMat({ map: TX.lawn, roughness: 1 }), 0.05, 0.5, [1.15, 1.08, 0.75]), -0.04);
+  worldUV(outer, 2.2);
+  buildHouse8(box);
+  addMeadow();
+  addRidges();
+  // the white blocks with balconies to the east and north-east (the street photo shows them stepping down the lane)
+  aptBlock(458, 72, 500, 196); aptBlock(458, 0, 500, 22); aptBlock(583, 0, 627, 84); aptBlock(583, 104, 627, 200);
+  aptBlock(680, 30, 724, 132); aptBlock(680, 172, 724, 266);
   // new blocks to the south-east, one still under construction
-  block(575, 310, 636, 432, 15.5, "wallGrey", "flat");
+  aptBlock(575, 310, 636, 432, 5, false);
   block(576, 452, 646, 612, 10.5, "scaffold", "flat");
-  block(670, 305, 724, 600, 15.5, "wallLight", "flat");
-  block(150, 0, 305, 74, 12.5, "wallGrey", "flat");                                    // the block across Ahornallee
+  aptBlock(670, 305, 724, 600, 5, false);
+  aptBlock(150, 0, 305, 74, 4, false);                                                   // the block across Ahornallee
   block(404, 338, 416, 352, 2.3, "wallWarm", "tile", 0.8);                              // allotment shed
   // site cabins and the tower crane
   const cabin = (u, v, col, rot = 0) => { const [cx, cz] = A(u, v); const m = new THREE.Mesh(new THREE.BoxGeometry(6, 2.6, 2.4), plainMat({ color: col, roughness: 0.6, metalness: 0.2 }));
@@ -832,18 +980,19 @@ function addNeighbourhood(box) {
   const spots = [];
   for (let u = 0; u < AER.W; u += 7.5) for (let v = 632; v < AER.H; v += 7.5) spots.push([u + (rnd() - 0.5) * 6, v + (rnd() - 0.5) * 6 + (v < 640 ? rnd() * 10 : 0), 1]);
   for (let u = 230; u < 395; u += 14) spots.push([u + rnd() * 5, 118 + rnd() * 30, 0.6]);
-  for (const [u, v] of [[310, 215], [312, 250], [318, 280], [520, 260], [540, 250], [650, 230], [650, 140], [540, 80], [560, 150], [740, 300], [690, 640], [620, 650], [430, 420], [480, 410]]) spots.push([u, v, 0.55]);
+  for (const [u, v] of [[520, 260], [540, 250], [650, 230], [650, 140], [540, 80], [560, 150], [740, 300], [690, 640], [620, 650], [430, 420], [480, 410]]) spots.push([u, v, 0.55]);
   const crownGeo = new THREE.IcosahedronGeometry(1, 1), trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 1, 6);
   const crowns = new THREE.InstancedMesh(crownGeo, plainMat({ roughness: 0.9, color: 0xffffff }), spots.length * 2);
   const trunks = new THREE.InstancedMesh(trunkGeo, plainMat({ color: 0x4a3a2c, roughness: 1 }), spots.length);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
   spots.forEach(([u, v, big], i) => {
     const [x, z] = A(u, v), h = (6 + rnd() * 7) * big + 3, r = (2.4 + rnd() * 2.2) * Math.max(0.6, big);
-    m4.compose(new THREE.Vector3(x, h / 2 - 0.2, z), q, new THREE.Vector3(1, h, 1)); trunks.setMatrixAt(i, m4);
+    const gy = terrainY(x, z) + 0.2;
+    m4.compose(new THREE.Vector3(x, gy + h / 2 - 0.2, z), q, new THREE.Vector3(1, h, 1)); trunks.setMatrixAt(i, m4);
     for (let k = 0; k < 2; k++) {
       const rr = r * (k ? 0.75 : 1);
       q.setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 3, 0));
-      m4.compose(new THREE.Vector3(x + (rnd() - 0.5) * r * 0.6, h + rr * (k ? 1.2 : 0.4), z + (rnd() - 0.5) * r * 0.6), q, new THREE.Vector3(rr, rr * (0.85 + rnd() * 0.3), rr));
+      m4.compose(new THREE.Vector3(x + (rnd() - 0.5) * r * 0.6, gy + h + rr * (k ? 1.2 : 0.4), z + (rnd() - 0.5) * r * 0.6), q, new THREE.Vector3(rr, rr * (0.85 + rnd() * 0.3), rr));
       crowns.setMatrixAt(i * 2 + k, m4);
       col.setHSL(0.23 + rnd() * 0.08, 0.38 + rnd() * 0.18, 0.27 + rnd() * 0.13); crowns.setColorAt(i * 2 + k, col);
     }
@@ -1012,7 +1161,7 @@ function stopTour() { if (guide && !guide.paused && !troop) setGuidePaused(true)
 const P = (x, z) => [x, z];
 const GUIDE = [
   { name: "Entrance hall", clock: 8.5, pos: [4.95, EYE, 5.7], tgt: [10.5, 1.15, 5.5], via: [],
-    text: "Welcome to L08.02, on the ground floor of Lehmgrubenstrasse 8: new terraced houses to the east, open fields and forest to the south. The hall runs almost seven metres, with a shoe cabinet, an oak bench and a mirror by the door." },
+    text: "Welcome to L08.02, on the ground floor of Lehmgrubenstrasse 8: a white three-storey block among its neighbours on the lane, with meadow and forest to the south and the Jura behind. The hall runs almost seven metres, with a shoe cabinet, an oak bench and a mirror by the door." },
   { name: "Bedroom", clock: 9.0, pos: [5.45, EYE, 4.05], tgt: [7.4, 0.85, 1.2], via: [P(5.31, 5.35), P(5.31, 4.55)],
     text: "Zimmer 1 opens onto the south garden, so the sun reaches the pine bed by mid-morning. White wardrobes along one wall, an oak dresser with a mirror opposite." },
   { name: "Work and guest room", clock: 9.75, pos: [9.25, EYE, 4.2], tgt: [9.9, 1.0, 0.8], via: [P(5.31, 4.6), P(5.6, 5.3), P(7.3, 5.33), P(9.24, 5.45), P(9.24, 4.7)],
@@ -1677,6 +1826,8 @@ function setClock(t) {
   sunLight.intensity = 3.9 * Math.pow(Tl, 0.8) * sstep(-0.01, 0.05, Math.sin(sun.el));
   sunLight.position.copy(CENTER).addScaledVector(sun.dir, 40); sunLight.target.position.copy(CENTER);
   fill.intensity = 0.85 * sky.day + 0.04;
+  for (const m of glowMats) m.emissiveIntensity = 0.9 * (1 - sstep(-0.12, 0.06, Math.sin(sun.el)));
+  for (const m of ridgeMats) m.color.setRGB(0.3, 0.42, 0.28).multiplyScalar(0.12 + 0.88 * sky.day).lerp(new THREE.Color(...sky.hor.map((v) => Math.min(1, v * (0.25 + 0.75 * sky.day)))), m.userData.haze);
   if (scene.fog) scene.fog.color.setRGB(...mix([0.02, 0.025, 0.04], [0.74, 0.8, 0.86], sky.day).map((v, i) => Math.min(1, v * (1 - 0.35 * sky.warm) + sky.hor[i] * 0.35 * sky.warm)));
   fill.color.setRGB(...mix([0.95, 0.96, 0.97], sky.hor.map((v) => Math.min(1, v)), 0.6 * sky.warm));
   for (const l of lamps) {

@@ -133,7 +133,10 @@ The flat's seven monkeys live in the Reduit; walk past its door (the guided tour
 library) and they burst out, and on the tour one of them takes a book
 from the BILLY wall and reads in the STRANDMON for the rest of the tour (typing `banana` lets them out any time). Another claims the Zwift bike and keeps pedalling.
 
-The surroundings are traced from an aerial photo of Lehmgrubenstrasse 8 (0.204 m per pixel): paths and
+The building and its street follow Street View photos: No. 8 has three storeys of white render with bronze
+windows and venetian blinds, staggered cantilevered balconies with bar railings under projecting roof slabs, and
+the entrance canopy with its number; the neighbours are the same kind of block stepping down the lane, with
+unmown meadow, a Scots pine, beech hedges and the Jura ridges on the horizon. The layout of the surroundings is traced from an aerial photo of Lehmgrubenstrasse 8 (0.204 m per pixel): paths and
 Ahornallee, the car park, fields and sand pit, the allotments, the terraced houses to the east, the new blocks
 and the crane to the south-east, and the forest along the south. The photo puts the garden on the south side,
 so the walkthrough's compass (and sun path) is turned 90° from the brochure reading the planner still uses.
